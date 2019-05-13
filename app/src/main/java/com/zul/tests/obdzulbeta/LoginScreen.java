@@ -66,12 +66,11 @@ public class LoginScreen extends AppCompatActivity {
 
         String carLine = brandCar + "," + modelCar + "," + yearCar + "," + engineCar + "," + fuelTypeCar + "\n";
 
-        String yourFilePath = this.getFilesDir() + "/" + FILENAME;
-        File yourFile = new File( yourFilePath );
+        String filePath = this.getFilesDir() + "/" + FILENAME;
+        File file = new File( filePath );
 
 
-        if (yourFile.exists()) {
-            // do something
+        if (file.exists()) {
 
 
         FileInputStream fis = openFileInput(FILENAME);

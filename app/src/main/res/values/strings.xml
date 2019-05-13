@@ -10,4 +10,10 @@
     <string name="come_ar">começar</string>
     <string name="carList">Lista de carros</string>
     <string name="delete">Delete</string>
+    <string name="consumo_de_comb_stivel">Consumo de combustível</string>
+    <string name="codigos_de_erro">Códigos de erro</string>
+    <string name="temperatura">Temperatura</string>
+    <string name="bateria">Bateria</string>
+    <string name="alternador">Alternador</string>
+    <string name="status">conectando..</string>
 </resources>

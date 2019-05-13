@@ -48,11 +48,11 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        String yourFilePath = this.getFilesDir() + "/" + FILENAME;
-        File yourFile = new File( yourFilePath );
+        String filePath = this.getFilesDir() + "/" + FILENAME;
+        File file = new File( filePath );
 
 
-        if (yourFile.exists()) {
+        if (file.exists()) {
 
             FileInputStream fis = openFileInput(FILENAME);
             InputStreamReader isr = new InputStreamReader(fis);
