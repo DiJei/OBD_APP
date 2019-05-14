@@ -1,10 +1,8 @@
 package com.zul.tests.obdzulbeta.OBDService;
-
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Message;
 import android.util.Log;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -25,13 +23,11 @@ public class TCPSocketManager {
         ip = ip_address;
         port = port_address;
         mHandler = handler;
-
     }
 
     public void sendData(String msg) {
         SocketSender sender = new SocketSender();
         sender.execute(msg);
-
     }
 
     public void setHandler(android.os.Handler handle) {
@@ -57,7 +53,6 @@ public class TCPSocketManager {
                 //get response from server
                 while ((incomingData =  inFromServer.readLine()) != null && !incomingData.equals("")) {
                     receive.add(incomingData);
-
                 }
                 inFromServer.close();
                 pw.close();
@@ -75,5 +70,4 @@ public class TCPSocketManager {
             return null;
         }
     }
-
 }

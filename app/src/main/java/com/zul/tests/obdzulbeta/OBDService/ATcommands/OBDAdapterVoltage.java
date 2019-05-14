@@ -10,6 +10,7 @@ public class OBDAdapterVoltage extends OBDCommand {
 
     public OBDAdapterVoltage(BluetoothManager btManage, android.os.Handler handler) {
         super("ATRV\r\n", btManage,  handler);
+        btManage.setHandler(obdCommandHandler);
     }
 
     public OBDAdapterVoltage(TCPSocketManager tcpSocketManager, android.os.Handler handler) {
@@ -20,9 +21,9 @@ public class OBDAdapterVoltage extends OBDCommand {
     @Override
     public String formatAnwser(ArrayList<String> message) {
         if ( message.get(0).contains("V")) {
-            String response = message.get(0).substring(message.get(0).indexOf("V"));
-            String value =  message.get(0).substring(1);
-            return value;
+            String response = message.get(0);
+            String value =  response.substring(0,response.length() - 1);
+            return "ATRV " + value;
         }
         else {
             return "NO DATA";

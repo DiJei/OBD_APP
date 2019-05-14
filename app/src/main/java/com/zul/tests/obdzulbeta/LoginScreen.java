@@ -20,17 +20,21 @@ import java.io.InputStreamReader;
 public class LoginScreen extends AppCompatActivity {
 
     EditText year,engine,model,brand,fuelType = null;
+    String connectionType = "";
+    String btDevice = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login_screen);
-
+        Bundle extras = getIntent().getExtras();
         brand    = (EditText)findViewById(R.id.brandText);
         model    = (EditText)findViewById(R.id.modelText);
         engine   = (EditText)findViewById(R.id.engineText);
         year     = (EditText)findViewById(R.id.yearText);
         fuelType = (EditText)findViewById(R.id.fuelType);
+        connectionType = extras.getString("CONECTION_TYPE");
+        btDevice = extras.getString("BT_DEVICE");
     }
 
     public void beginService(View view) throws IOException {
@@ -72,7 +76,6 @@ public class LoginScreen extends AppCompatActivity {
 
         if (file.exists()) {
 
-
         FileInputStream fis = openFileInput(FILENAME);
         InputStreamReader isr = new InputStreamReader(fis);
         BufferedReader bufferedReader = new BufferedReader(isr);
@@ -91,8 +94,9 @@ public class LoginScreen extends AppCompatActivity {
         Toast.makeText(getApplicationContext(), "Gravado", Toast.LENGTH_LONG).show();
         //Parte para tela de Serviços e conecta com OBD
         Intent intent = new Intent(LoginScreen.this, ServiceActivity.class);
-        intent.putExtra("CAR_INFO",carLine);
+        intent.putExtra("CAR_INFO", carLine);
+        intent.putExtra("CONECTION_TYPE", connectionType);
+        intent.putExtra("BT_DEVICE" ,btDevice);
         startActivity(intent);
-
     }
 }

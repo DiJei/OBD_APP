@@ -28,6 +28,8 @@ public class ServiceActivity extends AppCompatActivity {
     OBDService myOBDService  = null;
     private static final int OBD_COMMAND = 0;
     private static final int PROTOCOL_OBD = 5;
+    String connectionType = "";
+    String deviceBT = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,11 +37,18 @@ public class ServiceActivity extends AppCompatActivity {
         setContentView(R.layout.activity_service);
         Bundle extras = getIntent().getExtras();
         carInfo = extras.getString("CAR_INFO");
+        connectionType = extras.getString("CONECTION_TYPE");
+        deviceBT = extras.getString("BT_DEVICE");
         status = (TextView) findViewById(R.id.statusText);
-        myOBDService  = new OBDService(uiHandler, "192.168.0.10", 35000);
+        if (connectionType.equals("WIFI"))
+            myOBDService  = new OBDService(uiHandler, "192.168.0.10", 35000);
+        else if (connectionType.equals("BT")) {
+            String[] parts = deviceBT.split(" ");
+            myOBDService = new OBDService(uiHandler, parts[1]);
+        }
         myOBDService.configOBD();
-
     }
+
 
     public void deleteProfile(View view) throws IOException {
         ArrayList<String> lines = new ArrayList();
@@ -84,6 +93,7 @@ public class ServiceActivity extends AppCompatActivity {
                 case OBD_COMMAND:
                     if ( bundle != null)
                         message  = bundle.getString("data");
+                       Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
                     break;
                 case PROTOCOL_OBD:
                     if ( bundle != null)
@@ -96,4 +106,16 @@ public class ServiceActivity extends AppCompatActivity {
             }
         }
     };
+
+    public void tempButton(View view) {
+        myOBDService.getCoolTemp();
+    }
+
+    public void batButton(View view) {
+        myOBDService.getAdapterVoltage();
+    }
+
+    public void startConfig(View view) {
+        myOBDService.configOBD();
+    }
 }

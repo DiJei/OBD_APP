@@ -9,6 +9,7 @@ import java.util.ArrayList;
 public class SpeedCommand extends OBDCommand {
     public SpeedCommand(BluetoothManager btManage, android.os.Handler handler) {
         super("010D\r\n", btManage,  handler);
+        btManage.setHandler(obdCommandHandler);
     }
 
     public SpeedCommand(TCPSocketManager tcpSocketManager, android.os.Handler handler) {
@@ -25,7 +26,7 @@ public class SpeedCommand extends OBDCommand {
             double A  = 1;
             A = Integer.parseInt(parts[2], 16);
             value = String.valueOf((int) A);
-            return value;
+            return "010D " + value;
         }
         else {
             return "NO DATA";

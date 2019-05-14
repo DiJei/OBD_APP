@@ -36,7 +36,8 @@
             android:id="@+id/fuelConsumption"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/consumo_de_comb_stivel" />
+            android:text="@string/consumo_de_comb_stivel"
+            android:onClick="startConfig"/>
 
         <Button
             android:id="@+id/dtc"
@@ -48,13 +49,15 @@
             android:id="@+id/temp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/temperatura" />
+            android:text="@string/temperatura"
+            android:onClick="tempButton"/>
 
         <Button
             android:id="@+id/battery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/bateria" />
+            android:text="@string/bateria"
+            android:onClick="batButton"/>
 
         <Button
             android:id="@+id/alternator"

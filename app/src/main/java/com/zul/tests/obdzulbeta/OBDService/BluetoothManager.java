@@ -5,14 +5,19 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.os.Bundle;
 import android.os.Message;
+import android.util.Log;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.UUID;
 
 public class BluetoothManager {
-    private static final int MESSAGE_READ_WIFI = 2;
+    private static final int MESSAGE_READ_BT = 1;
+    private static final int THREAD_READY = 7;
     ConnectedThread mConnectedThread = null;
     ConnectThread   mConnectThread   = null;
     BluetoothAdapter mBluetoothAdapter = null;
@@ -30,7 +35,6 @@ public class BluetoothManager {
     public void startClient(BluetoothDevice device) {
         mConnectThread = new ConnectThread(device, mBluetoothAdapter, BT_UUID);
         mConnectThread.start();
-
     }
 
     public void write(byte[] b) {
@@ -38,6 +42,12 @@ public class BluetoothManager {
             mConnectedThread.write(b);
         }
     }
+
+
+    public void setHandler(android.os.Handler handle) {
+        mHandler = handle;
+    }
+
 
     //Thread to establish connection
     private class ConnectThread extends Thread {
@@ -80,8 +90,16 @@ public class BluetoothManager {
             }
 
             // Do work to manage the connection (in a separate thread)
-            mConnectedThread = new ConnectedThread(mmSocket, mHandler);
+            mConnectedThread = new ConnectedThread(mmSocket);
             mConnectedThread.start();
+
+            Message readMsg = mHandler.obtainMessage();
+            Bundle bundle2 = new Bundle();
+            bundle2.putString("DATA", "OK");
+            readMsg.setData(bundle2);
+            readMsg.what = THREAD_READY;
+            mHandler.sendMessage(readMsg);
+
         }
 
         /** Will cancel an in-progress connection, and close the socket */
@@ -97,12 +115,10 @@ public class BluetoothManager {
         private final BluetoothSocket mmSocket;
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
-        private transient final android.os.Handler myHandler;
-        public ConnectedThread(BluetoothSocket socket, android.os.Handler handler) {
+        public ConnectedThread(BluetoothSocket socket) {
             mmSocket = socket;
             InputStream tmpIn = null;
             OutputStream tmpOut = null;
-            myHandler = handler;
 
             // Get the input and output streams, using temp objects because
             // member streams are final
@@ -116,24 +132,38 @@ public class BluetoothManager {
         }
 
         public void run() {
+
+
+
             byte[] buffer = new byte[20];  // buffer store for the stream
 
             int bytes; // bytes returned from read()
 
             // Keep listening to the InputStream until an exception occurs
             while (true) {
+                ArrayList<String> receive =  new ArrayList<>();
+                String incomingData = new String();
                 try {
                     // Read from the InputStream
-                    mmInStream.read(buffer,0,6);
+                    // mmInStream.read(buffer,0,6);
                     // Send the obtained bytes to the UI activity
-                    String readMessage = new String(buffer,"UTF-8");
+                    //String readMessage = new String(buffer,"UTF-8");
+                    BufferedReader inFromServer = new BufferedReader(new InputStreamReader(mmInStream));
+                    //get response from server
+                    incomingData = inFromServer.readLine();
+                    receive.add(incomingData);
+                    //while ((incomingData =  inFromServer.readLine()) != null && !incomingData.equals("")) {
+                    //    receive.add(incomingData);
+                    //}
 
-                    Message readMsg = myHandler.obtainMessage();
-                    Bundle bundle2 = new Bundle();
-                    bundle2.putString("Key", readMessage);
-                    readMsg.setData(bundle2);
-                    readMsg.what = MESSAGE_READ_WIFI;
-                    myHandler.sendMessage(readMsg);
+                    if(!incomingData.equals("") && !incomingData.contains("SEARCHING") && !incomingData.contains("CAN ERROR")) {
+                        Message readMsg = mHandler.obtainMessage();
+                        Bundle bundle2 = new Bundle();
+                        bundle2.putStringArrayList("DATA", receive);
+                        readMsg.setData(bundle2);
+                        readMsg.what = MESSAGE_READ_BT;
+                        mHandler.sendMessage(readMsg);
+                    }
                 } catch (IOException e) {
                     break;
                 }
@@ -144,7 +174,10 @@ public class BluetoothManager {
         public void write(byte[] bytes) {
             try {
                 mmOutStream.write(bytes);
-            } catch (IOException e) { }
+                mmOutStream.flush();
+            } catch (IOException e) {
+                Log.d("BT", e.toString());
+            }
             return;
         }
 
@@ -160,5 +193,9 @@ public class BluetoothManager {
         if (mmSocket != null)
             return  mmSocket.isConnected();
         return false;
+    }
+
+    public void stopBTmanager() {
+        mConnectedThread.cancel();
     }
 }

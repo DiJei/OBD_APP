@@ -10,6 +10,7 @@ public class RPMCommand extends OBDCommand {
 
     public RPMCommand(BluetoothManager btManage, android.os.Handler handler) {
         super("010C\r\n", btManage,  handler);
+        btManage.setHandler(obdCommandHandler);
     }
 
     public RPMCommand(TCPSocketManager tcpSocketManager, android.os.Handler handler) {
@@ -28,7 +29,7 @@ public class RPMCommand extends OBDCommand {
             B = Integer.parseInt(parts[3], 16);
             A = (256 * A + B) / 4;
             value = String.valueOf((int) A);
-            return value;
+            return "410C " + value;
         }
         else {
             return "NO DATA";
