@@ -6,8 +6,13 @@ import android.os.Message;
 import com.zul.tests.obdzulbeta.OBDService.ATcommands.ATcommand;
 import com.zul.tests.obdzulbeta.OBDService.ATcommands.OBDAdapterVoltage;
 import com.zul.tests.obdzulbeta.OBDService.Service01.EngineCoolantTemperature;
+import com.zul.tests.obdzulbeta.OBDService.Service01.IntakeAirTemperature;
+import com.zul.tests.obdzulbeta.OBDService.Service01.IntakeManifoldPressure;
 import com.zul.tests.obdzulbeta.OBDService.Service01.RPMCommand;
 import com.zul.tests.obdzulbeta.OBDService.Service01.SpeedCommand;
+import com.zul.tests.obdzulbeta.OBDService.Service03.TroubleCodes;
+import com.zul.tests.obdzulbeta.OBDService.Service07.PendingTroubleCodes;
+import com.zul.tests.obdzulbeta.OBDService.Service0A.PermanentTroubleCodes;
 
 import java.util.ArrayList;
 import java.util.UUID;
@@ -45,11 +50,6 @@ public class OBDService {
             "Not Found"
     };
 
-    /** Constant <code>dtcLetters={'P', 'C', 'B', 'U'}</code> */
-    protected final static char[] dtcLetters = {'P', 'C', 'B', 'U'};
-    /** Constant <code>hexArray="0123456789ABCDEF".toCharArray()</code> */
-    protected final static char[] hexArray = "0123456789ABCDEF".toCharArray();
-
 
     //For Bluetooth Device
     public  OBDService(android.os.Handler handler, String device) {
@@ -69,6 +69,8 @@ public class OBDService {
         mWifiTCPSocketManager = new TCPSocketManager("192.168.0.10", 35000, obdHandler);
     }
 
+
+    /*-------------------COMMMANDS---------------------*/
     public void sendATCommand(String msg) {
         ATcommand myATcommand;
         if (mWifiTCPSocketManager != null)
@@ -114,6 +116,54 @@ public class OBDService {
         myOBDAdapterVoltage.OBDSendPID();
     }
 
+
+    public void getMAP() {
+        IntakeManifoldPressure myIntakeManifoldPressure;
+        if (mWifiTCPSocketManager != null)
+            myIntakeManifoldPressure = new IntakeManifoldPressure(mWifiTCPSocketManager, uiHandler);
+        else
+            myIntakeManifoldPressure = new IntakeManifoldPressure(mBluetoothManager, uiHandler);
+        myIntakeManifoldPressure.OBDSendPID();
+    }
+
+    public void getIAT() {
+        IntakeAirTemperature myIntakeAirTemperature;
+        if (mWifiTCPSocketManager != null)
+            myIntakeAirTemperature = new IntakeAirTemperature(mWifiTCPSocketManager, uiHandler);
+        else
+            myIntakeAirTemperature = new IntakeAirTemperature(mBluetoothManager, uiHandler);
+        myIntakeAirTemperature.OBDSendPID();
+    }
+
+    public void getTroubleCodes() {
+        TroubleCodes myTroubleCodes;
+        if (mWifiTCPSocketManager != null)
+            myTroubleCodes = new TroubleCodes(mWifiTCPSocketManager, uiHandler);
+        else
+            myTroubleCodes = new TroubleCodes(mBluetoothManager, uiHandler);
+        myTroubleCodes.OBDSendPID();
+    }
+
+    public void getPendingCodes() {
+        PendingTroubleCodes myPendingTroubleCodes;
+        if (mWifiTCPSocketManager != null)
+            myPendingTroubleCodes = new PendingTroubleCodes(mWifiTCPSocketManager, uiHandler);
+        else
+            myPendingTroubleCodes = new PendingTroubleCodes(mBluetoothManager, uiHandler);
+        myPendingTroubleCodes.OBDSendPID();
+    }
+
+    public void getPermanetCodes() {
+        PermanentTroubleCodes myPermanentTroubleCodes;
+        if (mWifiTCPSocketManager != null)
+            myPermanentTroubleCodes = new PermanentTroubleCodes(mWifiTCPSocketManager, uiHandler);
+        else
+            myPermanentTroubleCodes = new PermanentTroubleCodes(mBluetoothManager, uiHandler);
+        myPermanentTroubleCodes.OBDSendPID();
+    }
+    /*-------------------------------------------------*/
+
+
     public void configOBD() {
         configList = new ArrayList();
         configList.add("ATE0");
@@ -134,6 +184,7 @@ public class OBDService {
             mBluetoothManager.stopBTmanager();
         }
     }
+
 
     private  final android.os.Handler obdHandler = new android.os.Handler()
     {

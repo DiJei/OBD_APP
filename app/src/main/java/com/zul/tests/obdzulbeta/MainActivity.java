@@ -27,12 +27,14 @@ import java.util.ArrayList;
 import java.util.Set;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
+    private static final int REQUEST_ENABLE_BT = 10;
     String FILENAME = "listCars";
     BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     private static final String[] conections = new String[] {"WIFI", "BT", "BLE"};
     Spinner dropdown = null;
     String selectedConnection = "";
     String deviceBT = "";
+    Set<BluetoothDevice> pairedDevices;
 
 
     @Override
@@ -47,42 +49,43 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         if (mBluetoothAdapter == null)
             Toast.makeText(getApplicationContext(), "Bluetooth não disponivel", Toast.LENGTH_SHORT).show();
-        else {
-            mBluetoothAdapter.enable();
-        }
 }
 
     //Performing action onItemSelected and onNothing selected
     @Override
     public void onItemSelected(AdapterView<?> arg0, View arg1, int position,long id) {
         selectedConnection = conections[position];
-        Set<BluetoothDevice> pairedDevices;
         if (selectedConnection.equals("BT")) {
-            ArrayList<String> devices_list = new ArrayList<>();
-
-            AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-            View row = getLayoutInflater().inflate(R.layout.devices_list,null);
-            ListView listBT = (ListView)row.findViewById(R.id.deviceList);
-            builder.setTitle("Escolha dispositivo");
-            final ArrayAdapter<String> mArrayAdapter = new ArrayAdapter<String>(MainActivity.this, android.R.layout.simple_list_item_activated_1);
-            listBT.setAdapter(mArrayAdapter);
-            pairedDevices = mBluetoothAdapter.getBondedDevices();
-            if (pairedDevices.size() > 0) {
-                for (BluetoothDevice device : pairedDevices) {
-                    mArrayAdapter.add(device.getName() + " " + device.getAddress());
-                }
-                builder.setAdapter(mArrayAdapter, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        //Inicia nova activiy para conexão
-                        deviceBT = mArrayAdapter.getItem(which);
-                    }
-                });
-                AlertDialog alert = builder.create();
-                alert.show();
+            if(!mBluetoothAdapter.isEnabled()) {
+                Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+                
             }
-            else
-                Toast.makeText(getApplicationContext(), "Nenhum dispositivo pareado", Toast.LENGTH_SHORT).show();
+            else {
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                View row = getLayoutInflater().inflate(R.layout.devices_list,null);
+                ListView listBT = (ListView)row.findViewById(R.id.deviceList);
+                builder.setTitle("Escolha dispositivo");
+                final ArrayAdapter<String> mArrayAdapter = new ArrayAdapter<String>(MainActivity.this, android.R.layout.simple_list_item_activated_1);
+                listBT.setAdapter(mArrayAdapter);
+                pairedDevices = mBluetoothAdapter.getBondedDevices();
+                if (pairedDevices.size() > 0) {
+                    for (BluetoothDevice device : pairedDevices) {
+                        mArrayAdapter.add(device.getName() + " " + device.getAddress());
+                    }
+                    builder.setAdapter(mArrayAdapter, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            //Inicia nova activiy para conexão
+                            deviceBT = mArrayAdapter.getItem(which);
+                        }
+                    });
+                    AlertDialog alert = builder.create();
+                    alert.show();
+                }
+                else
+                    Toast.makeText(getApplicationContext(), "Nenhum dispositivo pareado", Toast.LENGTH_SHORT).show();
+            }
 
         }
 
@@ -148,4 +151,38 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
 
     }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_ENABLE_BT) {
+            if (resultCode == RESULT_OK) {
+                mBluetoothAdapter.enable();
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                View row = getLayoutInflater().inflate(R.layout.devices_list,null);
+                ListView listBT = (ListView)row.findViewById(R.id.deviceList);
+                builder.setTitle("Escolha dispositivo");
+                final ArrayAdapter<String> mArrayAdapter = new ArrayAdapter<String>(MainActivity.this, android.R.layout.simple_list_item_activated_1);
+                listBT.setAdapter(mArrayAdapter);
+                pairedDevices = mBluetoothAdapter.getBondedDevices();
+                if (pairedDevices.size() > 0) {
+                    for (BluetoothDevice device : pairedDevices) {
+                        mArrayAdapter.add(device.getName() + " " + device.getAddress());
+                    }
+                    builder.setAdapter(mArrayAdapter, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            //Inicia nova activiy para conexão
+                            deviceBT = mArrayAdapter.getItem(which);
+                        }
+                    });
+                    AlertDialog alert = builder.create();
+                    alert.show();
+                }
+                else
+                    Toast.makeText(getApplicationContext(), "Nenhum dispositivo pareado", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+
 }

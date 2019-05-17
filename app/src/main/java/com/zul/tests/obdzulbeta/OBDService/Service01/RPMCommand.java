@@ -21,7 +21,7 @@ public class RPMCommand extends OBDCommand {
     @Override
     public String formatAnwser(ArrayList<String> message) {
         if ( message.get(0).contains("41")) {
-            String response = message.get(1).substring(message.get(0).indexOf("41"));
+            String response = message.get(0).substring(message.get(0).indexOf("41"));
             String parts[] = response.split(" ");
             String value = "";
             double A,B  = 1;

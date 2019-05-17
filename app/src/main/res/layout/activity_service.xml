@@ -32,38 +32,10 @@
         app:layout_constraintTop_toBottomOf="@+id/delete"
         android:gravity="start">
 
-        <Button
-            android:id="@+id/fuelConsumption"
+        <ListView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/consumo_de_comb_stivel"
-            android:onClick="startConfig"/>
-
-        <Button
-            android:id="@+id/dtc"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/codigos_de_erro" />
-
-        <Button
-            android:id="@+id/temp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/temperatura"
-            android:onClick="tempButton"/>
-
-        <Button
-            android:id="@+id/battery"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/bateria"
-            android:onClick="batButton"/>
-
-        <Button
-            android:id="@+id/alternator"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/alternador" />
+            android:id="@+id/listOfPIDs"/>
 
     </LinearLayout>
 

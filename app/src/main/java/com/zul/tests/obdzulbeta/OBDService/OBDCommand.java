@@ -16,6 +16,12 @@ public abstract class OBDCommand {
     ArrayList<String> message;
     android.os.Handler requestHandler;
 
+
+    /** Constant <code>dtcLetters={'P', 'C', 'B', 'U'}</code> */
+    protected final static char[] dtcLetters = {'P', 'C', 'B', 'U'};
+    /** Constant <code>hexArray="0123456789ABCDEF".toCharArray()</code> */
+    protected final static char[] hexArray = "0123456789ABCDEF".toCharArray();
+
     //Bluetooth
     public OBDCommand(String command, BluetoothManager btManager, android.os.Handler handler) {
         cmd = command;
@@ -46,6 +52,10 @@ public abstract class OBDCommand {
     //Then send to Service
     public abstract String formatAnwser(ArrayList<String> message);
 
+    //For DTC reader commands
+    protected byte hexStringToByteArray(char s) {
+        return (byte) ((Character.digit(s, 16) << 4));
+    }
 
 
     public  final android.os.Handler obdCommandHandler = new android.os.Handler()
@@ -60,12 +70,12 @@ public abstract class OBDCommand {
             switch (msg.what) {
                 case MESSAGE_READ_WIFI:
                     String anwser = formatAnwser(message);
-
-                    bundle.putString("data", anwser);
-                    readMsg.setData(bundle);
-                    readMsg.what = OBD_COMMAND;
-                    requestHandler.sendMessage(readMsg);
-
+                    if (!anwser.equals("")) {
+                        bundle.putString("data", anwser);
+                        readMsg.setData(bundle);
+                        readMsg.what = OBD_COMMAND;
+                        requestHandler.sendMessage(readMsg);
+                    }
                     break;
                 case MESSAGE_READ_BT:
                     break;
