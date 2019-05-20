@@ -43,6 +43,8 @@ public class PendingTroubleCodes extends OBDCommand {
             return "47 " + listOfDTC;
 
         }
+        else if (message.get(0).contains("CAN"))
+            return message.get(0);
         else {
             return "";
         }

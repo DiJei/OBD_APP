@@ -20,7 +20,7 @@ public class RPMCommand extends OBDCommand {
 
     @Override
     public String formatAnwser(ArrayList<String> message) {
-        if ( message.get(0).contains("41")) {
+        if ( message.get(0).contains("41") && message.get(0).contains("0C")) {
             String response = message.get(0).substring(message.get(0).indexOf("41"));
             String parts[] = response.split(" ");
             String value = "";

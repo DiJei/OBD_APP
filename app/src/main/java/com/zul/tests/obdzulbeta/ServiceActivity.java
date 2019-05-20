@@ -1,7 +1,6 @@
 package com.zul.tests.obdzulbeta;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -52,6 +51,7 @@ public class ServiceActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         countDTC = 10;
         amount_fuel = 0;
+        count = 10;
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_service);
         Bundle extras = getIntent().getExtras();
@@ -80,7 +80,6 @@ public class ServiceActivity extends AppCompatActivity {
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 
                 if(position == 4) {
-                    handler.removeCallbacksAndMessages(null);
                     count = 10;
                     countDTC = 0;
                     getDTC();
@@ -88,6 +87,17 @@ public class ServiceActivity extends AppCompatActivity {
             }
         });
 
+
+         tempCool = "0";
+         RPM = "0";
+         battery = "0";
+         alternator = "0";
+         MAP= "0";
+         IAT= "0";
+         speed = "0";
+         pendingCodes= " ";
+         troubleCodes= " ";
+         permanentCodes = " ";
 
     }
 
@@ -181,27 +191,27 @@ public class ServiceActivity extends AppCompatActivity {
                         }
                         else if (parts[0].contains("41") || parts[0].contains("ATRV")) {
                             if(parts[0].contains("05")) {
-                                count = 1;
+                                count += 1;
                                 tempCool = parts[1];
                             }
                             else if(parts[0].contains("0C")) {
-                                count = 2;
+                                count += 1;
                                 RPM = parts[1];
                             }
                             else if(parts[0].contains("0D")) {
-                                count = 4;
+                                count += 1;
                                 speed = parts[1];
                             }
                             else if(parts[0].contains("0B")) {
-                                count = 5;
+                                count += 1;
                                 MAP = parts[1];
                             }
                             else if(parts[0].contains("0F")) {
-                                count = 6;
+                                count += 1;
                                 IAT = parts[1];
                             }
                             else if(parts[0].contains("ATRV")) {
-                                count = 3;
+                                count += 1;
                                 if (!RPM.equals("")) {
                                     if (Integer.parseInt(RPM) > 1000) {
                                         alternator = parts[1];
@@ -210,30 +220,35 @@ public class ServiceActivity extends AppCompatActivity {
                                     }
                                 }
                             }
+                            if (count > 6)
+                                count = 6;
                         }
                         else if(parts[0].contains("43")) {
                             if (parts.length > 1)
                                 troubleCodes = parts[1];
                             else
-                                troubleCodes = "";
+                                troubleCodes = " ";
                             countDTC = 1;
                         }
                         else if(parts[0].contains("47")) {
                             if (parts.length > 1)
                                 pendingCodes = parts[1];
                             else
-                                pendingCodes = "";
+                                pendingCodes = " ";
                             countDTC = 2;
                         }
                         else if(parts[0].contains("4A")) {
                             if (parts.length > 1)
                                 permanentCodes = parts[1];
                             else
-                                permanentCodes = "";
+                                permanentCodes = " ";
                             countDTC = 3;
                         }
 
+                        if(count < 10)
                         getData();
+
+                        if(countDTC > 0 && countDTC < 8)
                         getDTC();
                     }
                     break;
@@ -242,16 +257,11 @@ public class ServiceActivity extends AppCompatActivity {
                         message  = bundle.getString("data");
                     obd_protocol = message;
                     status.setText("pronto");
-
+                    count = 0;
+                    countDTC = 10;
+                    amount_fuel = 0;
                     //-- Start Loop  read data--//
-                    handler = new Handler();
-                    handler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            getData();
-                            handler.postDelayed(this, 1000);
-                        }
-                    }, 1000);
+                    getData();
                     //--------------------------//
                     break;
                 default:
@@ -269,46 +279,51 @@ public class ServiceActivity extends AppCompatActivity {
         float IMAP  = (rpm * pressure)/ (airTemp * 2);
         double MAP_C = (IMAP/60) * (80/10) * 1.6 * K;
         double cons = MAP_C /(14.7*720);
-        double  reuslt =  (cons - cons_ant)*0.6;
+        double  result =  (cons - cons_ant)*0.6;
         cons_ant = cons;
-        return reuslt;
+        if(result < 0)
+            result *= -1;
+        return result;
     }
 
     public void getData() {
-        if (countDTC > 9)
-        switch (count) {
-            case 0:
-                myOBDService.getCoolTemp();
-                break;
-            case 1:
-                myOBDService.getRPM();
-                break;
-            case 2:
-                myOBDService.getAdapterVoltage();
-                break;
-            case 3:
-                myOBDService.getSpeed();
-                break;
-            case 4:
-                myOBDService.getMAP();
-                break;
-            case 5:
-                myOBDService.getIAT();
-                break;
-            case 6:
-            case 7:
-                //UPDATE LIST VIEW
-                updateValue(0, tempCool);
-                updateValue(1,battery);
-                updateValue(2,alternator);
-                //--Calculate instant fuel Consumption---//
-                amount_fuel += calculateFuelConsumption(Integer.parseInt(RPM),Integer.parseInt(IAT),Integer.parseInt(MAP));
-                updateValue(3, String.format("%.2f",amount_fuel) );
-                //----------------
-                count = 0;
-                break;
-             default:
-                 break;
+        if (countDTC > 9) {
+            switch (count) {
+                case 0:
+                    myOBDService.getCoolTemp();
+                    break;
+                case 1:
+                    myOBDService.getRPM();
+                    break;
+                case 2:
+                    myOBDService.getAdapterVoltage();
+                    break;
+                case 3:
+                    myOBDService.getSpeed();
+                    break;
+                case 4:
+                    myOBDService.getMAP();
+                    break;
+                case 5:
+                    myOBDService.getIAT();
+                    break;
+                case 6:
+                    //UPDATE LIST VIEW
+                    updateValue(0, tempCool);
+                    updateValue(1, battery);
+                    updateValue(2, alternator);
+                    //--Calculate instant fuel Consumption---//
+                    amount_fuel += calculateFuelConsumption(Integer.parseInt(RPM), Integer.parseInt(IAT), Integer.parseInt(MAP));
+                    updateValue(3, String.format("%.2f", amount_fuel));
+                    //----------------
+                    count = 0;
+                    myOBDService.getCoolTemp();
+                    break;
+                default:
+                    count = 0;
+                    myOBDService.getCoolTemp();
+                    break;
+            }
         }
     }
 
@@ -324,21 +339,10 @@ public class ServiceActivity extends AppCompatActivity {
                 myOBDService.getPermanetCodes();
                break;
             case 3:
-            case 4:
-            case 5:
                 showDTCcodes();
                 countDTC = 10;
                 count = 0;
-                //-- Start Loop  read data--//
-                handler = new Handler();
-                handler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        getData();
-                        handler.postDelayed(this, 1000);
-                    }
-                }, 1000);
-                //--------------------------//
+                getData();
                 break;
             default:
                 break;

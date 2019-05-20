@@ -41,6 +41,8 @@ public class PermanentTroubleCodes extends OBDCommand {
             }
             return "4A " + listOfDTC;
         }
+        else if (message.get(0).contains("CAN"))
+            return message.get(0);
         else {
             return "";
         }

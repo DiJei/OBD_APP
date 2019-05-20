@@ -45,6 +45,8 @@ public class TroubleCodes extends OBDCommand {
             return "43 " + listOfDTC;
 
         }
+        else if (message.get(0).contains("CAN"))
+            return message.get(0);
         else {
             return "";
         }
