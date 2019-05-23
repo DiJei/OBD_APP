@@ -1,9 +1,14 @@
 package com.zul.tests.obdzulbeta;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.bluetooth.BluetoothAdapter;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -23,28 +28,35 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
-import android.os.Handler;
+
 
 
 public class ServiceActivity extends AppCompatActivity {
-    double cons_ant = 0;
+    MyReceiver myReceiver;
     double amount_fuel;
     int count = 0;
+    String btAdress = "";
     String obd_protocol = "";
     String carInfo = "";
     String FILENAME = "listCars";
     TextView status = null;
     OBDService myOBDService  = null;
-    private static final int OBD_COMMAND = 0;
-    private static final int PROTOCOL_OBD = 5;
+    int countDTC;
     String connectionType = "";
     String deviceBT = "";
     String tempCool, RPM, battery, alternator, MAP, IAT, speed = "0";
     String pendingCodes, troubleCodes,  permanentCodes = " ";
     ArrayList<ItemPID> dataList = new ArrayList<>();
     ListView pidListView = null;
-    Handler handler;
-    int countDTC;
+    private static final int OBD_COMMAND = 0;
+    private static final int PROTOCOL_OBD = 5;
+    private static final int BT_THREAD_READY = 7;
+
+
+    private static final String SHARED_PREFS = "SHARED_PREFS";
+    private static final String CONECTION_TYPE = "CONECTION_TYPE";
+    private static final String BT = "BT";
+    private static final String CAR_INFO = "CAR_INFO";
 
 
     @Override
@@ -54,19 +66,45 @@ public class ServiceActivity extends AppCompatActivity {
         count = 10;
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_service);
+
+
+        SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
+        carInfo = sharedPreferences.getString(CAR_INFO,"");
+        connectionType = sharedPreferences.getString(CONECTION_TYPE,"");
+        deviceBT = sharedPreferences.getString(BT,"");
+
+        //Get Data from MainActivity or LoginActivity
         Bundle extras = getIntent().getExtras();
-        carInfo = extras.getString("CAR_INFO");
-        connectionType = extras.getString("CONECTION_TYPE");
-        deviceBT = extras.getString("BT_DEVICE");
-        status = (TextView) findViewById(R.id.statusText);
-        pidListView = (ListView)findViewById(R.id.listOfPIDs);
-        if (connectionType.equals("WIFI"))
-            myOBDService  = new OBDService(uiHandler, "192.168.0.10", 35000);
-        else if (connectionType.equals("BT")) {
-            String[] parts = deviceBT.split(" ");
-            myOBDService = new OBDService(uiHandler, parts[1]);
+        if (extras != null) { ;
+            carInfo = extras.getString("CAR_INFO");
+            connectionType = extras.getString("CONECTION_TYPE");
+            if (connectionType.equals("BT"))
+                deviceBT = extras.getString("BT_DEVICE");
         }
-        myOBDService.configOBD();
+
+        //Save the setting on shared preferences
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(CAR_INFO,carInfo);
+        editor.putString(CONECTION_TYPE,connectionType);
+        editor.putString(BT,deviceBT);
+        editor.apply();
+
+
+        status = (TextView) findViewById(R.id.statusText);
+        pidListView = (ListView) findViewById(R.id.listOfPIDs);
+
+        if (connectionType.equals("WIFI")) {
+            if (myOBDService == null)
+            myOBDService = new OBDService(uiHandler, "192.168.0.10", 35000);
+            myOBDService.configOBD();
+        } else if (connectionType.equals("BT")) {
+            String[] parts = deviceBT.split(" ");
+            btAdress = parts[1];
+            BluetoothAdapter mBTAdapter = BluetoothAdapter.getDefaultAdapter();
+            if (myOBDService == null)
+                myOBDService = new OBDService(uiHandler, parts[1],true);
+        }
+
         dataList.add(new ItemPID( "Temperatura da água", "x", "°C"));
         dataList.add(new ItemPID( "Bateria", "x", "V"));
         dataList.add(new ItemPID( "Alternador", "x", "V"));
@@ -80,9 +118,24 @@ public class ServiceActivity extends AppCompatActivity {
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 
                 if(position == 4) {
-                    count = 10;
+                    unregisterReceiver(myReceiver);
+                    Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
+                    stopService(serviceIntent);
                     countDTC = 0;
-                    getDTC();
+                    Runnable startDTC = new Runnable() {
+                        public void run() {
+                            getDTC();
+                        }
+                    };
+                    Runnable initBT = new Runnable() {
+                        public void run() {
+                            myOBDService = new OBDService(uiHandler, btAdress,false);
+                        }
+                    };
+                    Handler handler2 = new Handler();
+                    handler2.postDelayed(initBT, 1500);
+                    Handler handler = new Handler();
+                    handler.postDelayed(startDTC, 3000);
                 }
             }
         });
@@ -100,6 +153,41 @@ public class ServiceActivity extends AppCompatActivity {
          permanentCodes = " ";
 
     }
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        //Register receiver
+        myReceiver = new MyReceiver();
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(OBDReaderService.MY_ACTION);
+        registerReceiver(myReceiver, intentFilter);
+    }
+
+
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString("ConectionType", connectionType);
+        if(connectionType.equals("BT"))
+            outState.putString("BTDevice", deviceBT);
+
+        outState.putString("CarInfo", carInfo);
+    }
+
+
+    @Override
+    public void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        connectionType = savedInstanceState.getString("ConectionType");
+        btAdress = savedInstanceState.getString("BTDevice");
+
+    }
+
+
 
 
     public void deleteProfile(View view) throws IOException {
@@ -131,6 +219,8 @@ public class ServiceActivity extends AppCompatActivity {
         }
 
     }
+
+
 
     private void updateValue(int index, String val) {
         View v = pidListView.getChildAt(index - pidListView.getFirstVisiblePosition());
@@ -186,42 +276,6 @@ public class ServiceActivity extends AppCompatActivity {
                             if (countDTC != 10) {
                                 countDTC += 1;
                             }
-                            else
-                                count +=1;
-                        }
-                        else if (parts[0].contains("41") || parts[0].contains("ATRV")) {
-                            if(parts[0].contains("05")) {
-                                count += 1;
-                                tempCool = parts[1];
-                            }
-                            else if(parts[0].contains("0C")) {
-                                count += 1;
-                                RPM = parts[1];
-                            }
-                            else if(parts[0].contains("0D")) {
-                                count += 1;
-                                speed = parts[1];
-                            }
-                            else if(parts[0].contains("0B")) {
-                                count += 1;
-                                MAP = parts[1];
-                            }
-                            else if(parts[0].contains("0F")) {
-                                count += 1;
-                                IAT = parts[1];
-                            }
-                            else if(parts[0].contains("ATRV")) {
-                                count += 1;
-                                if (!RPM.equals("")) {
-                                    if (Integer.parseInt(RPM) > 1000) {
-                                        alternator = parts[1];
-                                    } else if (Integer.parseInt(RPM) < 100) {
-                                        battery = parts[1];
-                                    }
-                                }
-                            }
-                            if (count > 6)
-                                count = 6;
                         }
                         else if(parts[0].contains("43")) {
                             if (parts.length > 1)
@@ -245,10 +299,7 @@ public class ServiceActivity extends AppCompatActivity {
                             countDTC = 3;
                         }
 
-                        if(count < 10)
-                        getData();
-
-                        if(countDTC > 0 && countDTC < 8)
+                        if(countDTC < 8)
                         getDTC();
                     }
                     break;
@@ -257,12 +308,18 @@ public class ServiceActivity extends AppCompatActivity {
                         message  = bundle.getString("data");
                     obd_protocol = message;
                     status.setText("pronto");
-                    count = 0;
-                    countDTC = 10;
-                    amount_fuel = 0;
-                    //-- Start Loop  read data--//
-                    getData();
+
+                    //-- Start Loop Service read data--//
+                    Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
+                    serviceIntent.putExtra("BT_DEVICE", deviceBT);
+                    serviceIntent.putExtra("CAR_INFO", carInfo);
+                    serviceIntent.putExtra("CONECTION_TYPE", connectionType);
+                    myOBDService.stopOBDService();
+                    startService(serviceIntent);
                     //--------------------------//
+                    break;
+                case BT_THREAD_READY:
+                    getDTC();
                     break;
                 default:
                     break;
@@ -270,62 +327,6 @@ public class ServiceActivity extends AppCompatActivity {
         }
     };
 
-
-    //Calculte fuel consumption on delta 600 sec
-    public double calculateFuelConsumption(int rpm, int airTemp, int pressure) {
-        double K = 28.98/8.314;
-        if (airTemp == 0)
-            airTemp = 1;
-        float IMAP  = (rpm * pressure)/ (airTemp * 2);
-        double MAP_C = (IMAP/60) * (80/10) * 1.6 * K;
-        double cons = MAP_C /(14.7*720);
-        double  result =  (cons - cons_ant)*0.6;
-        cons_ant = cons;
-        if(result < 0)
-            result *= -1;
-        return result;
-    }
-
-    public void getData() {
-        if (countDTC > 9) {
-            switch (count) {
-                case 0:
-                    myOBDService.getCoolTemp();
-                    break;
-                case 1:
-                    myOBDService.getRPM();
-                    break;
-                case 2:
-                    myOBDService.getAdapterVoltage();
-                    break;
-                case 3:
-                    myOBDService.getSpeed();
-                    break;
-                case 4:
-                    myOBDService.getMAP();
-                    break;
-                case 5:
-                    myOBDService.getIAT();
-                    break;
-                case 6:
-                    //UPDATE LIST VIEW
-                    updateValue(0, tempCool);
-                    updateValue(1, battery);
-                    updateValue(2, alternator);
-                    //--Calculate instant fuel Consumption---//
-                    amount_fuel += calculateFuelConsumption(Integer.parseInt(RPM), Integer.parseInt(IAT), Integer.parseInt(MAP));
-                    updateValue(3, String.format("%.2f", amount_fuel));
-                    //----------------
-                    count = 0;
-                    myOBDService.getCoolTemp();
-                    break;
-                default:
-                    count = 0;
-                    myOBDService.getCoolTemp();
-                    break;
-            }
-        }
-    }
 
     public void getDTC() {
         switch(countDTC) {
@@ -341,12 +342,54 @@ public class ServiceActivity extends AppCompatActivity {
             case 3:
                 showDTCcodes();
                 countDTC = 10;
-                count = 0;
-                getData();
+                //-------------//
+                Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
+                serviceIntent.putExtra("BT_DEVICE", deviceBT);
+                serviceIntent.putExtra("CAR_INFO", carInfo);
+                serviceIntent.putExtra("CONECTION_TYPE", connectionType);
+                myOBDService.stopOBDService();
+                startService(serviceIntent);
+                IntentFilter intentFilter = new IntentFilter();
+                intentFilter.addAction(OBDReaderService.MY_ACTION);
+                registerReceiver(myReceiver, intentFilter);
+                //-------------//
                 break;
             default:
                 break;
         }
+    }
+
+
+    @Override
+    protected void onStop() {
+
+        unregisterReceiver(myReceiver);
+        super.onStop();
+    }
+
+    public void stopLog(View view) {
+        Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
+        stopService(serviceIntent);
+        unregisterReceiver(myReceiver);
+    }
+
+
+    private class MyReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context arg0, Intent arg1) {
+
+
+
+            ArrayList<String> listOfData;
+            listOfData = arg1.getStringArrayListExtra("DATA");
+
+            updateValue(0, listOfData.get(0));
+            updateValue(1, listOfData.get(1));
+            updateValue(2, listOfData.get(2));
+            updateValue(3, listOfData.get(3));
+        }
+
     }
 
 

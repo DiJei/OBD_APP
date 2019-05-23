@@ -60,7 +60,7 @@ public class TCPSocketManager {
                 Message readMsg = mHandler.obtainMessage();
                 Bundle bundle = new Bundle();
                 bundle.putStringArrayList("DATA",receive);
-                readMsg.setData(bundle);
+                 readMsg.setData(bundle);
                 readMsg.what = MESSAGE_READ_WIFI;
                 mHandler.sendMessage(readMsg);
             } catch (IOException e) {

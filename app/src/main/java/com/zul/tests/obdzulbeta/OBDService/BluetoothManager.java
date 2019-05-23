@@ -74,6 +74,7 @@ public class BluetoothManager {
         }
 
         public void run() {
+
             // Cancel discovery because it will slow down the connection
             mmAdapter.cancelDiscovery();
 

@@ -20,6 +20,7 @@ import java.util.UUID;
 
 public class OBDService {
 
+    Boolean init = true;
     ArrayList<String> listOfPIDs01 = new ArrayList<>();
     private static final int MESSAGE_READ_OBD = 1;
     private static final int THREAD_READY = 7;
@@ -52,13 +53,16 @@ public class OBDService {
 
 
     //For Bluetooth Device
-    public  OBDService(android.os.Handler handler, String device) {
+    public  OBDService(android.os.Handler handler, String device, Boolean INIT) {
         uiHandler = handler;
         mBTAdapter = BluetoothAdapter.getDefaultAdapter();
         BluetoothDevice btDevice = mBTAdapter.getRemoteDevice(device);
         BTUUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
         mBluetoothManager = new BluetoothManager(mBTAdapter, BTUUID, obdHandler);
-        mBluetoothManager.startClient(btDevice);
+        if(!mBluetoothManager.isConnected()) {
+            mBluetoothManager.startClient(btDevice);
+        }
+        init = INIT;
     }
 
     //For WiFi TCP Device
@@ -235,11 +239,15 @@ public class OBDService {
                                 getResponse = true;
                                 listOfPIDs01.add(message.get(x).substring(message.get(x).indexOf("41") + 4).replace(" ", ""));
                             }
-                            else if( message.get(x).contains("NO DATA")) {
+                            else if (message.get(x).contains("NO DATA")) {
                                 sendATCommand(configList.get(count));
                                 count += 1;
                                 getResponse = true;
                                 listOfPIDs01.add(" ");
+                            }
+                            else if (message.get(x).indexOf(0) == 'A') {
+                                count += 1;
+                                sendATCommand(configList.get(count));
                             }
                         }
                         if (!getResponse)
@@ -261,7 +269,8 @@ public class OBDService {
                 }
             }
             else if(msg.what == THREAD_READY) {
-                configOBD();
+                if(init)
+                    configOBD();
             }
         }
     };
