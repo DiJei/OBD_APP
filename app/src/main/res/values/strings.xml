@@ -16,5 +16,6 @@
     <string name="bateria">Bateria</string>
     <string name="alternador">Alternador</string>
     <string name="status">conectando..</string>
-    <string name="stop_log">stop log</string>
+    <string name="stop_log">STOP LOG</string>
+    <string name="home">HOME</string>
 </resources>

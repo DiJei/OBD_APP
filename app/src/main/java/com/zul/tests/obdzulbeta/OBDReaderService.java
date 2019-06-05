@@ -9,10 +9,18 @@ import android.os.IBinder;
 import android.os.Message;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
-
 import com.zul.tests.obdzulbeta.OBDService.OBDService;
-
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 
 import static com.zul.tests.obdzulbeta.App.CHANNEL_ID;
 
@@ -20,13 +28,15 @@ public class OBDReaderService extends Service {
     final static String MY_ACTION = "OBD_SERVICE";
     private static final int OBD_COMMAND = 0;
     OBDService myOBDService  = null;
-    String tempCool, RPM, battery, alternator, MAP, IAT, speed = "0";
+    String tempCool, RPM, battery, alternator, MAP, IAT, speed, volt = "0";
     int count = 0;
     int countDTC = 0;
     double amount_fuel;
     double cons_ant;
     String carInfo = "";
     int tryOuts = 0;
+    boolean flag_write = true;
+    File logFile = null;
 
     Handler handler = new Handler();
     private Runnable periodicUpdate = new Runnable () {
@@ -71,10 +81,18 @@ public class OBDReaderService extends Service {
         alternator = "0";
         MAP = "0";
         IAT = "0";
+        volt = "0";
         count = 0;
         countDTC = 0;
         amount_fuel = 0;
         cons_ant = 0;
+
+        try {
+            logFile = createLogFile();
+            updateLogFile("START " + getHour() + "\n");
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
 
         Intent notificationIntent = new Intent(this, ServiceActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
@@ -110,9 +128,51 @@ public class OBDReaderService extends Service {
     public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         myOBDService.stopOBDService();
+        updateLogFile("STOP " + getHour() + "\n");
+        flag_write = false;
         super.onDestroy();
     }
 
+    public String getHour() {
+        Calendar cal = Calendar.getInstance();
+        Date date=cal.getTime();
+        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+        String formattedDate = dateFormat.format(date);
+        return formattedDate;
+    }
+
+
+    public File createLogFile() throws FileNotFoundException {
+        Date day = Calendar.getInstance().getTime();
+        SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
+        String logName = "log-"+df.format(day)+".txt";
+        File file = new File(this.getFilesDir() + "/" + carInfo + "/" + logName);
+
+        if(file.exists())
+            return file;
+        else {
+            //to force the creation of file
+            PrintWriter printWriter = new PrintWriter(file);
+            printWriter.print("");
+            return file;
+        }
+    }
+
+    public void updateLogFile(String line)  {
+        if (!flag_write)
+            return;
+        try {
+            // Open given file in append mode.
+            BufferedWriter out = new BufferedWriter(
+                    new FileWriter(logFile.getPath(), true));
+            out.write(line);
+            out.close();
+        }
+        catch (IOException e) {
+
+        }
+
+    }
 
 
 
@@ -150,14 +210,15 @@ public class OBDReaderService extends Service {
                     myOBDService.getIAT();
                     break;
                 case 7:
-                    //UPDATE LIST VIEW
-                    //updateValue(0, tempCool);
-                    //updateValue(1, battery);
-                    //updateValue(2, alternator);
                     //--Calculate instant fuel Consumption---//
                     amount_fuel += calculateFuelConsumption(Integer.parseInt(RPM), Integer.parseInt(IAT), Integer.parseInt(MAP));
                     //updateValue(3, String.format("%.2f", amount_fuel));1
                     //----------------
+
+                    //Update Log File
+                    String line = tempCool + " " + speed + " " + RPM  + " " + MAP + " " + IAT + " " + volt + "\n";
+                    updateLogFile(line);
+                    //Send data for UI
                     Intent intent = new Intent();
                     intent.setAction(MY_ACTION);
                     ArrayList<String> listOFdata = new ArrayList<>();
@@ -167,6 +228,7 @@ public class OBDReaderService extends Service {
                     listOFdata.add( String.format("%.2f", amount_fuel));
                     intent.putStringArrayListExtra("DATA", listOFdata);
                     sendBroadcast(intent);
+                    //Reset order of commands
                     count = 0;
                 default:
                     break;
@@ -218,6 +280,7 @@ public class OBDReaderService extends Service {
                             else if(parts[0].contains("ATRV")) {
                                 count = 4;
                                 if (!RPM.equals("")) {
+                                    volt = parts[1];
                                     if (Integer.parseInt(RPM) > 1000) {
                                         alternator = parts[1];
                                     } else if (Integer.parseInt(RPM) < 100) {

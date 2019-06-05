@@ -1,34 +1,26 @@
 package com.zul.tests.obdzulbeta;
-
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
 import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.Toast;
-
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.FileFilter;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.Set;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
     private static final int REQUEST_ENABLE_BT = 10;
-    String FILENAME = "listCars";
     BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     private static final String[] conections = new String[] {"WIFI", "BT", "BLE"};
     Spinner dropdown = null;
@@ -36,11 +28,31 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     String deviceBT = "";
     Set<BluetoothDevice> pairedDevices;
 
+    private static final String SHARED_PREFS = "SHARED_PREFS";
+    private static final String CONECTION_TYPE = "CONECTION_TYPE";
+    private static final String BT = "BT";
+    private static final String CAR_INFO = "CAR_INFO";
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
+        String carInfo = sharedPreferences.getString(CAR_INFO,"");
+        String connectionType = sharedPreferences.getString(CONECTION_TYPE,"");
+        deviceBT = sharedPreferences.getString(BT,"");
+
+        if (!carInfo.equals("")) {
+            //Parte para tela de Serviços e conecta com OBD
+            Intent intent = new Intent(MainActivity.this, ServiceActivity.class);
+            intent.putExtra("CAR_INFO", carInfo);
+            intent.putExtra("CONECTION_TYPE", connectionType);
+            intent.putExtra("BT_DEVICE" ,deviceBT);
+            startActivity(intent);
+        }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, conections);
         Spinner dropdown = (Spinner)findViewById(R.id.conectionType);
@@ -49,7 +61,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         if (mBluetoothAdapter == null)
             Toast.makeText(getApplicationContext(), "Bluetooth não disponivel", Toast.LENGTH_SHORT).show();
-}
+    }
 
     //Performing action onItemSelected and onNothing selected
     @Override
@@ -100,6 +112,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     public void startService(View view) {
         Intent intent = new Intent(MainActivity.this, LoginScreen.class);
         intent.putExtra("CONECTION_TYPE", selectedConnection );
+        if (selectedConnection.equals("BT"))
+            intent.putExtra("BT_DEVICE", deviceBT );
         startActivity(intent);
     }
 
@@ -107,29 +121,23 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         final ArrayAdapter<String> mArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_activated_1);
         View row = getLayoutInflater().inflate(R.layout.car_list_view, null);
-        ArrayList<String> listOfCars = new ArrayList<>();
-
         ListView listCar = (ListView) row.findViewById(R.id.deviceList);
-        builder.setTitle("Escolha carro");
-        String line;
-
-        String filePath = this.getFilesDir() + "/" + FILENAME;
-        File file = new File( filePath );
-
-
-        if (file.exists()) {
-
-            FileInputStream fis = openFileInput(FILENAME);
-            InputStreamReader isr = new InputStreamReader(fis);
-            BufferedReader bufferedReader = new BufferedReader(isr);
-            while ((line = bufferedReader.readLine()) != null)
-                mArrayAdapter.add(line);
-            listCar.setAdapter(mArrayAdapter);
-
-            if(mArrayAdapter.getCount() < 1) {
-                Toast.makeText(getApplicationContext(),"Sem usuários", Toast.LENGTH_LONG).show();
-                return;
+        File[] directories = new File(String.valueOf(this.getFilesDir())).listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File file) {
+                return file.isDirectory();
             }
+        });
+
+        if(directories.length < 1) {
+            Toast.makeText(getApplicationContext(),"Sem usuários", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        for (int x = 0; x < directories.length; x ++)
+            mArrayAdapter.add(directories[x].getName());
+
+        listCar.setAdapter(mArrayAdapter);
 
         builder.setAdapter(mArrayAdapter, new DialogInterface.OnClickListener() {
             @Override
@@ -145,10 +153,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         AlertDialog alert = builder.create();
         alert.show();
-    }
-        else {
-            Toast.makeText(getApplicationContext(),"Sem usuários", Toast.LENGTH_LONG).show();
-        }
 
     }
 

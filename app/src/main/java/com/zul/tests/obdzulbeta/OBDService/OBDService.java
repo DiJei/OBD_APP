@@ -22,6 +22,8 @@ public class OBDService {
 
     Boolean init = true;
     ArrayList<String> listOfPIDs01 = new ArrayList<>();
+    ArrayList<String> listOfPIDs09 = new ArrayList<>();
+    String  vehicleVIN = "";
     private static final int MESSAGE_READ_OBD = 1;
     private static final int THREAD_READY = 7;
     Boolean getResponse = false;
@@ -36,6 +38,7 @@ public class OBDService {
     int port = 0;
     ArrayList<String> message;
     int count = 0;
+    ArrayList<String> vinByte = new ArrayList();
     private String[] ProtocolList = {
             "Auto",
             "SAE J1850 PWM",
@@ -168,19 +171,31 @@ public class OBDService {
     /*-------------------------------------------------*/
 
 
-    public void configOBD() {
-        configList = new ArrayList();
-        configList.add("ATE0");
-        configList.add("ATST19");
-        configList.add("ATH1");
-        configList.add("ATSP0");
-        configList.add("0100");
-        configList.add("0120");
-        configList.add("0140");
-        configList.add("0160");
-        configList.add("0180");
-        configList.add("ATDPN");
-        sendATCommand("ATZ");
+
+
+    public String decodeVIN(ArrayList<String> message) {
+
+        StringBuilder output = new StringBuilder("");
+        String hexStr;
+
+        hexStr = message.get(0).substring(19).replace(" ","");
+        for (int i = 0; i < hexStr.length(); i += 2) {
+            String str = hexStr.substring(i, i + 2);
+            output.append((char) Integer.parseInt(str, 16));
+        }
+        hexStr = message.get(1).substring(6).replace( " ", "");
+        for (int i = 0; i < hexStr.length(); i += 2) {
+            String str = hexStr.substring(i, i + 2);
+            output.append((char) Integer.parseInt(str, 16));
+        }
+        hexStr = message.get(2).substring(6).replace(" ", "");
+        for (int i = 0; i < hexStr.length(); i += 2) {
+            String str = hexStr.substring(i, i + 2);
+            output.append((char) Integer.parseInt(str, 16));
+        }
+
+        return output.toString();
+
     }
 
     public void stopOBDService() {
@@ -189,6 +204,44 @@ public class OBDService {
         }
     }
 
+
+    public ArrayList<String> getService01() {
+        return listOfPIDs01;
+    }
+
+    public ArrayList getService09() {
+        return listOfPIDs09;
+    }
+
+    public String getVIN() {
+        return vehicleVIN;
+    }
+
+
+    public void configOBD() {
+        configList = new ArrayList();
+        configList.add("ATZ");        // 0  Reset
+        configList.add("ATE0");       // 1  Echo OFF
+
+        configList.add("ATST19");     // 2  Timeout 100ms
+        configList.add("ATH1");       // 3  Headers ON
+        configList.add("ATSP0");      // 4  Protocol AUTO
+
+        configList.add("0100");       // 5  List Of PID 01
+        configList.add("0120");       // 6  List Of PID 01
+        configList.add("0140");       // 7  List Of PID 01
+        configList.add("0160");       // 8  List Of PID 01
+        configList.add("0180");       // 9  List Of PID 01
+
+        configList.add("0900");       // 10 List Of PID 09
+        configList.add("0902");       // 11 Car Chassi
+
+        configList.add("ATDPN");      // 12 Get protocol number
+
+
+        sendATCommand(configList.get(count));
+
+    }
 
     private  final android.os.Handler obdHandler = new android.os.Handler()
     {
@@ -202,26 +255,29 @@ public class OBDService {
                     message  = bundle.getStringArrayList("DATA");
                 switch (count) {
                     case 0:
-                        sendATCommand(configList.get(count));
                         count += 1;
+                        sendATCommand("ATE0");
                         break;
                     case 1:
                         int x;
                         for(x = 0; x < message.size(); x++) {
                             if (message.get(x).contains("OK")) {
-                                sendATCommand(configList.get(count));
                                 count += 1;
+                                sendATCommand(configList.get(count));
+                                break;
                             }
-                            else
-                                sendATCommand(configList.get(count - 1));
+                            else {
+                                sendATCommand(configList.get(count));
+                                break;
+                            }
                         }
                         break;
                     case 2:
                     case 3:
                     case 4:
                         if (message.get(0).contains("OK")) {
-                            sendATCommand(configList.get(count));
                             count += 1;
+                            sendATCommand(configList.get(count));
                         }
                         else
                             sendATCommand(configList.get(count));
@@ -234,30 +290,72 @@ public class OBDService {
                         getResponse = false;
                         for (x = 0; x < message.size(); x ++) {
                             if (message.get(x).contains("41")) {
-                                sendATCommand(configList.get(count));
                                 count += 1;
                                 getResponse = true;
                                 listOfPIDs01.add(message.get(x).substring(message.get(x).indexOf("41") + 4).replace(" ", ""));
-                            }
-                            else if (message.get(x).contains("NO DATA")) {
                                 sendATCommand(configList.get(count));
+                                break;
+                            }
+                            else if (message.get(x).contains("NO")) {
                                 count += 1;
                                 getResponse = true;
                                 listOfPIDs01.add(" ");
-                            }
-                            else if (message.get(x).indexOf(0) == 'A') {
-                                count += 1;
                                 sendATCommand(configList.get(count));
+                                break;
                             }
                         }
                         if (!getResponse)
                             sendATCommand(configList.get(count));
                         break;
                     case 10:
+                        getResponse = false;
+                        for (x = 0; x < message.size(); x ++) {
+                            if (message.get(x).contains("49")) {
+                                count += 1;
+                                getResponse = true;
+                                listOfPIDs09.add(message.get(x).substring(message.get(x).indexOf("49") + 4).replace(" ", ""));
+                                sendATCommand(configList.get(count));
+                                break;
+                            } else if (message.get(x).contains("NO")) {
+                                count += 1;
+                                getResponse = true;
+                                listOfPIDs09.add(" ");
+                                sendATCommand(configList.get(count));
+                                break;
+                            }
+                        }
+                        if (!getResponse)
+                            sendATCommand(configList.get(count ));
+                        break;
+                    case 11:
+                        getResponse = true;
+                        for (x = 0; x < message.size(); x++) {
+                            if (message.get(x).contains("ERROR"))
+                                getResponse = false;
+                            else
+                                vinByte.add(message.get(x));
+                        }
+                        if (vinByte.size() < 3)
+                            sendATCommand(configList.get(count));
+                        if(getResponse) {
+                            if (message.get(0).contains("49")) {
+                                vehicleVIN = decodeVIN(vinByte);
+                                count += 1;
+                                sendATCommand(configList.get(count));
+                            } else {
+                                sendATCommand(configList.get(count));
+                            }
+                        }
+                        else {
+                            sendATCommand(configList.get(count));
+                        }
+
+                        break;
+                    case 12:
                         Bundle uiBundle = new Bundle();
                         Message readMsg = uiHandler.obtainMessage();
                         if((message.get(0).contains("ERROR")) || (message.get(0).contains("NO")))
-                            sendATCommand(configList.get(count - 1));
+                            sendATCommand(configList.get(count));
                         else    {
                             String send = ProtocolList[Integer.parseInt(message.get(0).substring(message.get(0).indexOf("A") + 1))];
                             uiBundle.putString("data", send);

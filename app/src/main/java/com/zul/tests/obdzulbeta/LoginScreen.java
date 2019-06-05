@@ -9,13 +9,13 @@ import android.widget.EditText;
 
 import android.widget.Toast;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
 
-import java.io.FileOutputStream;
+import java.io.File;
+
+
+
 import java.io.IOException;
-import java.io.InputStreamReader;
+
 
 public class LoginScreen extends AppCompatActivity {
 
@@ -39,7 +39,7 @@ public class LoginScreen extends AppCompatActivity {
 
     public void beginService(View view) throws IOException {
 
-        String FILENAME = "listCars";
+        String FILENAME = "listCars.txt";
 
         String brandCar = brand.getText().toString();
         String modelCar = model.getText().toString();
@@ -68,30 +68,21 @@ public class LoginScreen extends AppCompatActivity {
             return;
         }
 
-        String carLine = brandCar + "," + modelCar + "," + yearCar + "," + engineCar + "," + fuelTypeCar + "\n";
-
-        String filePath = this.getFilesDir() + "/" + FILENAME;
-        File file = new File( filePath );
+        String carLine = brandCar + "-" + modelCar + "-" + yearCar + "-" + engineCar + "-" + fuelTypeCar ;
 
 
-        if (file.exists()) {
 
-        FileInputStream fis = openFileInput(FILENAME);
-        InputStreamReader isr = new InputStreamReader(fis);
-        BufferedReader bufferedReader = new BufferedReader(isr);
-        String line;
-        while ((line = bufferedReader.readLine()) != null) {
-            if (carLine.equals(line + "\n")) {
-                Toast.makeText(getApplicationContext(), "Já existente", Toast.LENGTH_LONG).show();
-                return;
-            }
+        //File newdir= this.getDir(carLine, Context.MODE_PRIVATE);
+        File newdir = new File(this.getFilesDir() + "/" + carLine);
+        if (!newdir.exists()) {
+            newdir.mkdirs();
+            Toast.makeText(getApplicationContext(), "Registrado", Toast.LENGTH_LONG).show();
         }
-    }
+        else {
+            Toast.makeText(getApplicationContext(), "Carro já registrado", Toast.LENGTH_LONG).show();
+        }
 
-        FileOutputStream fos = openFileOutput(FILENAME, Context.MODE_APPEND);
-        fos.write(carLine.getBytes());
-        fos.close();
-        Toast.makeText(getApplicationContext(), "Gravado", Toast.LENGTH_LONG).show();
+
         //Parte para tela de Serviços e conecta com OBD
         Intent intent = new Intent(LoginScreen.this, ServiceActivity.class);
         intent.putExtra("CAR_INFO", carLine);

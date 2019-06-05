@@ -6,11 +6,8 @@ import android.bluetooth.BluetoothSocket;
 import android.os.Bundle;
 import android.os.Message;
 import android.util.Log;
-
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.UUID;
@@ -25,6 +22,11 @@ public class BluetoothManager {
     private final BluetoothSocket btSocket = null;
     android.os.Handler mHandler = null;
     BluetoothSocket mmSocket = null;
+    byte[] buffer;
+
+    ArrayList<String> vinCar = new ArrayList<>();
+    int vinCount = 0;
+    boolean vinEnable = false;
 
     public BluetoothManager( BluetoothAdapter bluetoothAdapter, UUID BTUUID, android.os.Handler handler) {
         mBluetoothAdapter = bluetoothAdapter;
@@ -86,6 +88,7 @@ public class BluetoothManager {
                 // Unable to connect; close the socket and get out
                 try {
                     mmSocket.close();
+                    //Send conection problem
                 } catch (IOException closeException) { }
                 return;
             }
@@ -134,36 +137,55 @@ public class BluetoothManager {
 
         public void run() {
 
-
-
-            byte[] buffer = new byte[20];  // buffer store for the stream
-
-            int bytes; // bytes returned from read()
-
             // Keep listening to the InputStream until an exception occurs
             while (true) {
-                ArrayList<String> receive =  new ArrayList<>();
-                String incomingData = new String();
-                try {
-                    // Read from the InputStream
-                    // mmInStream.read(buffer,0,6);
-                    // Send the obtained bytes to the UI activity
-                    //String readMessage = new String(buffer,"UTF-8");
-                    BufferedReader inFromServer = new BufferedReader(new InputStreamReader(mmInStream));
-                    //get response from server
-                    incomingData = inFromServer.readLine();
-                    receive.add(incomingData);
-                    //while ((incomingData =  inFromServer.readLine()) != null && !incomingData.equals("")) {
-                    //    receive.add(incomingData);
-                    //}
+                ArrayList<String> receive = new ArrayList<>();
+                buffer = new byte[36];
+                String message = "";
 
-                    if(!incomingData.equals("") && !incomingData.contains("SEARCHING") && !incomingData.contains("CAN ERROR")) {
-                        Message readMsg = mHandler.obtainMessage();
-                        Bundle bundle2 = new Bundle();
-                        bundle2.putStringArrayList("DATA", receive);
-                        readMsg.setData(bundle2);
-                        readMsg.what = MESSAGE_READ_BT;
-                        mHandler.sendMessage(readMsg);
+                try {
+                    int data = mmInStream.available();
+                    if (data > 0) {
+
+
+                        mmInStream.read(buffer);
+                        message = new String(buffer, 0, data);
+
+                        message = message.replace("\n", "");
+                        message = message.replace("\r", "");
+                        message = message.replace(">", "");
+                        message = message.replace(" ", "");
+
+
+                        if (message.contains("4902")) {
+                            vinEnable = true;
+                        }
+                        if (vinEnable) {
+                            vinCar.add(message);
+                            vinCount = vinCount + 1;
+                        }
+
+
+                        if (!message.equals("") && !message.contains("SEARCHING") && !message.contains("CANERROR") && (vinEnable == false)) {
+                            receive.add(message);
+                            Message readMsg = mHandler.obtainMessage();
+                            Bundle bundle2 = new Bundle();
+                            bundle2.putStringArrayList("DATA", receive);
+                            readMsg.setData(bundle2);
+                            readMsg.what = MESSAGE_READ_BT;
+                            mHandler.sendMessage(readMsg);
+                        }
+                        else if (vinCount >= 3) {
+                            Message readMsg = mHandler.obtainMessage();
+                            Bundle bundle2 = new Bundle();
+                            bundle2.putStringArrayList("DATA", vinCar);
+                            readMsg.setData(bundle2);
+                            readMsg.what = MESSAGE_READ_BT;
+                            mHandler.sendMessage(readMsg);
+                            vinCount = 0;
+                            vinEnable = false;
+                            vinCar = new ArrayList<>();
+                        }
                     }
                 } catch (IOException e) {
                     break;
@@ -199,4 +221,21 @@ public class BluetoothManager {
     public void stopBTmanager() {
         mConnectedThread.cancel();
     }
+
+    public String byteToHex(byte num) {
+        char[] hexDigits = new char[2];
+        hexDigits[0] = Character.forDigit((num >> 4) & 0xF, 16);
+        hexDigits[1] = Character.forDigit((num & 0xF), 16);
+        return new String(hexDigits);
+    }
+
+    public String encodeHexString(byte[] byteArray) {
+        StringBuffer hexStringBuffer = new StringBuffer();
+        for (int i = 0; i < byteArray.length; i++) {
+            hexStringBuffer.append(byteToHex(byteArray[i]));
+        }
+        return hexStringBuffer.toString();
+    }
+
+
 }

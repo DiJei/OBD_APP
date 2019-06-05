@@ -1,7 +1,6 @@
 package com.zul.tests.obdzulbeta;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -17,15 +16,19 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 import com.zul.tests.obdzulbeta.OBDService.OBDService;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,7 +54,7 @@ public class ServiceActivity extends AppCompatActivity {
     private static final int OBD_COMMAND = 0;
     private static final int PROTOCOL_OBD = 5;
     private static final int BT_THREAD_READY = 7;
-
+    Button logginButton = null;
 
     private static final String SHARED_PREFS = "SHARED_PREFS";
     private static final String CONECTION_TYPE = "CONECTION_TYPE";
@@ -75,7 +78,7 @@ public class ServiceActivity extends AppCompatActivity {
 
         //Get Data from MainActivity or LoginActivity
         Bundle extras = getIntent().getExtras();
-        if (extras != null) { ;
+        if (extras != null) {
             carInfo = extras.getString("CAR_INFO");
             connectionType = extras.getString("CONECTION_TYPE");
             if (connectionType.equals("BT"))
@@ -92,17 +95,22 @@ public class ServiceActivity extends AppCompatActivity {
 
         status = (TextView) findViewById(R.id.statusText);
         pidListView = (ListView) findViewById(R.id.listOfPIDs);
+        logginButton = (Button) findViewById(R.id.logButton);
 
         if (connectionType.equals("WIFI")) {
             if (myOBDService == null)
-            myOBDService = new OBDService(uiHandler, "192.168.0.10", 35000);
-            myOBDService.configOBD();
+                myOBDService = new OBDService(uiHandler, "192.168.0.10", 35000);
+            if(!isLogOn())
+                myOBDService.configOBD();
+
         } else if (connectionType.equals("BT")) {
             String[] parts = deviceBT.split(" ");
             btAdress = parts[1];
-            BluetoothAdapter mBTAdapter = BluetoothAdapter.getDefaultAdapter();
             if (myOBDService == null)
-                myOBDService = new OBDService(uiHandler, parts[1],true);
+                if(!isLogOn())
+                    myOBDService = new OBDService(uiHandler, parts[1],true);
+                else
+                    myOBDService = new OBDService(uiHandler, parts[1], false);
         }
 
         dataList.add(new ItemPID( "Temperatura da água", "x", "°C"));
@@ -118,7 +126,15 @@ public class ServiceActivity extends AppCompatActivity {
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 
                 if(position == 4) {
-                    unregisterReceiver(myReceiver);
+                    //In Case receiver is already not registed
+                    try {
+
+                        unregisterReceiver(myReceiver);
+                    } catch(IllegalArgumentException e) {
+
+                        e.printStackTrace();
+                    }
+
                     Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
                     stopService(serviceIntent);
                     countDTC = 0;
@@ -158,13 +174,13 @@ public class ServiceActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-
         //Register receiver
         myReceiver = new MyReceiver();
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(OBDReaderService.MY_ACTION);
         registerReceiver(myReceiver, intentFilter);
     }
+
 
 
 
@@ -188,6 +204,32 @@ public class ServiceActivity extends AppCompatActivity {
     }
 
 
+    public boolean isLogOn() {
+
+        File file = new File(this.getFilesDir() + "/" + carInfo +  "/info.txt");
+        if(!file.exists())
+            return false;
+        BufferedReader reader;
+        try {
+            reader = new BufferedReader(new FileReader(this.getFilesDir() + "/" + carInfo +  "/info.txt"));
+            String line = reader.readLine();
+            while (line != null) {
+                if(line.contains("LOG")) {
+                    if(line.substring(4).equals("on")) {
+                        reader.close();
+                        return true;
+                    }
+                    reader.close();
+                    return false;
+                }
+                line = reader.readLine();
+            }
+            reader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 
 
     public void deleteProfile(View view) throws IOException {
@@ -246,7 +288,6 @@ public class ServiceActivity extends AppCompatActivity {
         mArrayAdapter.add(pendingCodes);
         mArrayAdapter.add("Códigos de falhas permamentes:");
         mArrayAdapter.add(permanentCodes);
-
         builder.setAdapter(mArrayAdapter, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -258,74 +299,6 @@ public class ServiceActivity extends AppCompatActivity {
         alert.show();
         //--------------
     }
-
-
-    private  final android.os.Handler uiHandler = new android.os.Handler()
-    {
-        @Override
-        public void handleMessage(Message msg)
-        {
-            Bundle bundle = msg.getData();
-            String message = "";
-            switch (msg.what) {
-                case OBD_COMMAND:
-                    if ( bundle != null) {
-                        message = bundle.getString("data");
-                        String parts[] = message.split(" ");
-                        if (parts[0].contains("CAN") || parts[0].contains("NO")) {
-                            if (countDTC != 10) {
-                                countDTC += 1;
-                            }
-                        }
-                        else if(parts[0].contains("43")) {
-                            if (parts.length > 1)
-                                troubleCodes = parts[1];
-                            else
-                                troubleCodes = " ";
-                            countDTC = 1;
-                        }
-                        else if(parts[0].contains("47")) {
-                            if (parts.length > 1)
-                                pendingCodes = parts[1];
-                            else
-                                pendingCodes = " ";
-                            countDTC = 2;
-                        }
-                        else if(parts[0].contains("4A")) {
-                            if (parts.length > 1)
-                                permanentCodes = parts[1];
-                            else
-                                permanentCodes = " ";
-                            countDTC = 3;
-                        }
-
-                        if(countDTC < 8)
-                        getDTC();
-                    }
-                    break;
-                case PROTOCOL_OBD:
-                    if ( bundle != null)
-                        message  = bundle.getString("data");
-                    obd_protocol = message;
-                    status.setText("pronto");
-
-                    //-- Start Loop Service read data--//
-                    Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
-                    serviceIntent.putExtra("BT_DEVICE", deviceBT);
-                    serviceIntent.putExtra("CAR_INFO", carInfo);
-                    serviceIntent.putExtra("CONECTION_TYPE", connectionType);
-                    myOBDService.stopOBDService();
-                    startService(serviceIntent);
-                    //--------------------------//
-                    break;
-                case BT_THREAD_READY:
-                    getDTC();
-                    break;
-                default:
-                    break;
-            }
-        }
-    };
 
 
     public void getDTC() {
@@ -363,14 +336,72 @@ public class ServiceActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
 
-        unregisterReceiver(myReceiver);
+        //In Case receiver is already not registed
+        try {
+            unregisterReceiver(myReceiver);
+        } catch(IllegalArgumentException e) {
+
+            e.printStackTrace();
+        }
         super.onStop();
     }
 
-    public void stopLog(View view) {
+
+    //Stop/Start read log
+    public void startStopLog(View view) {
+
         Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
-        stopService(serviceIntent);
-        unregisterReceiver(myReceiver);
+
+        // Stop logging
+        if (logginButton.getText().equals("STOP LOG")) {
+            stopService(serviceIntent);
+            //In Case receiver is already not registed
+            try {
+
+                unregisterReceiver(myReceiver);
+            } catch(IllegalArgumentException e) {
+
+                e.printStackTrace();
+            }
+            logginButton.setText("START LOG");
+            setLogOFF();
+        }
+        else if(logginButton.getText().equals("START LOG")) {
+            //Start service reader
+            serviceIntent.putExtra("BT_DEVICE", deviceBT);
+            serviceIntent.putExtra("CAR_INFO", carInfo);
+            serviceIntent.putExtra("CONECTION_TYPE", connectionType);
+            startService(serviceIntent);
+            //Start listerner
+            myReceiver = new MyReceiver();
+            IntentFilter intentFilter = new IntentFilter();
+            intentFilter.addAction(OBDReaderService.MY_ACTION);
+            registerReceiver(myReceiver, intentFilter);
+            logginButton.setText("STOP LOG");
+            setLogON();
+        }
+    }
+
+    public void backToMainActivity(View view) {
+        Intent intent = new Intent(ServiceActivity.this, MainActivity.class);
+        if (isLogOn()) {
+            Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
+            stopService(serviceIntent);
+            //In Case receiver is already not registed
+            try {
+                unregisterReceiver(myReceiver);
+            } catch(IllegalArgumentException e) {
+
+                e.printStackTrace();
+            }
+        }
+        //Save the setting on shared preferences
+        myOBDService.stopOBDService();
+        SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(CAR_INFO,"");
+        editor.apply();
+        startActivity(intent);
     }
 
 
@@ -378,8 +409,6 @@ public class ServiceActivity extends AppCompatActivity {
 
         @Override
         public void onReceive(Context arg0, Intent arg1) {
-
-
 
             ArrayList<String> listOfData;
             listOfData = arg1.getStringArrayListExtra("DATA");
@@ -429,4 +458,156 @@ public class ServiceActivity extends AppCompatActivity {
         }
     }
 
+
+    public void createInfoFIle() throws FileNotFoundException {
+        File file = new File(this.getFilesDir() + "/" + carInfo + "/info.txt");
+        //If already exist dont need to write over again
+        if (file.exists())
+            return;
+        //Create info file for the car
+        PrintWriter printWriter = new PrintWriter(file);
+        printWriter.println (carInfo);
+        printWriter.println (myOBDService.getService01());
+        printWriter.println (myOBDService.getService09());
+        printWriter.println (myOBDService.getVIN());
+        printWriter.println ("LOG:off");
+        printWriter.close ();
+
+    }
+
+    public void setLogON() {
+        try {
+            File fileToChange = new File(this.getFilesDir() + "/" + carInfo + "/info.txt");
+
+            // input the file content to the StringBuffer "input"
+            BufferedReader file = new BufferedReader(new FileReader(fileToChange));
+            StringBuffer inputBuffer = new StringBuffer();
+            String line;
+
+            while ((line = file.readLine()) != null) {
+                inputBuffer.append(line);
+                inputBuffer.append('\n');
+            }
+            file.close();
+            String inputStr = inputBuffer.toString();
+
+
+            // logic to replace lines in the string (could use regex here to be generic)
+            inputStr = inputStr.replace("LOG:off","LOG:on");
+
+
+
+            // write the new string with the replaced line OVER the same file
+            FileOutputStream fileOut = new FileOutputStream( fileToChange );
+            fileOut.write(inputStr.getBytes());
+            fileOut.close();
+
+        } catch (Exception e) {
+
+        }
+    }
+
+    public void setLogOFF() {
+        try {
+            File fileToChange = new File(this.getFilesDir() + "/" + carInfo + "/info.txt");
+
+            // input the file content to the StringBuffer "input"
+            BufferedReader file = new BufferedReader(new FileReader(fileToChange));
+            StringBuffer inputBuffer = new StringBuffer();
+            String line;
+
+            while ((line = file.readLine()) != null) {
+                inputBuffer.append(line);
+                inputBuffer.append('\n');
+            }
+            file.close();
+            String inputStr = inputBuffer.toString();
+
+
+            // logic to replace lines in the string (could use regex here to be generic)
+            inputStr = inputStr.replace("LOG:on","LOG:off");
+
+
+            // write the new string with the replaced line OVER the same file
+            FileOutputStream fileOut = new FileOutputStream( fileToChange );
+            fileOut.write(inputStr.getBytes());
+            fileOut.close();
+
+        } catch (Exception e) {
+
+        }
+    }
+
+    private  final android.os.Handler uiHandler = new android.os.Handler()
+    {
+        @Override
+        public void handleMessage(Message msg)
+        {
+            Bundle bundle = msg.getData();
+            String message = "";
+            switch (msg.what) {
+                case OBD_COMMAND:
+                    if ( bundle != null) {
+                        message = bundle.getString("data");
+                        String parts[] = message.split(" ");
+                        if (parts[0].contains("CAN") || parts[0].contains("NO")) {
+                            if (countDTC != 10) {
+                                countDTC += 1;
+                            }
+                        }
+                        else if(parts[0].contains("43")) {
+                            if (parts.length > 1)
+                                troubleCodes = parts[1];
+                            else
+                                troubleCodes = " ";
+                            countDTC = 1;
+                        }
+                        else if(parts[0].contains("47")) {
+                            if (parts.length > 1)
+                                pendingCodes = parts[1];
+                            else
+                                pendingCodes = " ";
+                            countDTC = 2;
+                        }
+                        else if(parts[0].contains("4A")) {
+                            if (parts.length > 1)
+                                permanentCodes = parts[1];
+                            else
+                                permanentCodes = " ";
+                            countDTC = 3;
+                        }
+
+                        if(countDTC < 8)
+                            getDTC();
+                    }
+                    break;
+                case PROTOCOL_OBD:
+                    if ( bundle != null)
+                        message  = bundle.getString("data");
+                    obd_protocol = message;
+                    status.setText("pronto");
+                    //----Create Info file----//
+                    try {
+                        createInfoFIle();
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                    //-- Start Loop Service read data--//
+                    Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
+                    serviceIntent.putExtra("BT_DEVICE", deviceBT);
+                    serviceIntent.putExtra("CAR_INFO", carInfo);
+                    serviceIntent.putExtra("CONECTION_TYPE", connectionType);
+                    myOBDService.stopOBDService();
+                    startService(serviceIntent);
+                    setLogON();
+                    //--------------------------//
+                    break;
+                case BT_THREAD_READY:
+                    getDTC();
+                    break;
+                default:
+                    break;
+            }
+        }
+    };
 }
