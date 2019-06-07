@@ -109,8 +109,6 @@ public class ServiceActivity extends AppCompatActivity {
             if (myOBDService == null)
                 if(!isLogOn())
                     myOBDService = new OBDService(uiHandler, parts[1],true);
-                else
-                    myOBDService = new OBDService(uiHandler, parts[1], false);
         }
 
         dataList.add(new ItemPID( "Temperatura da água", "x", "°C"));
@@ -230,38 +228,6 @@ public class ServiceActivity extends AppCompatActivity {
         }
         return false;
     }
-
-
-    public void deleteProfile(View view) throws IOException {
-        ArrayList<String> lines = new ArrayList();
-        String filePath = this.getFilesDir() + "/" + FILENAME;
-        File file = new File( filePath );
-
-        if (file.exists()) {
-
-            FileInputStream fis = openFileInput(FILENAME);
-            InputStreamReader isr = new InputStreamReader(fis);
-            BufferedReader bufferedReader = new BufferedReader(isr);
-            String line;
-            while ((line = bufferedReader.readLine()) != null) {
-                if (line.equals(carInfo) == false)
-                    lines.add(line);
-            }
-
-            file.delete();
-
-            FileOutputStream fos = openFileOutput(FILENAME, Context.MODE_APPEND);
-            int x;
-            for (x = 0; x < lines.size(); x++)
-                fos.write((lines.get(x) + "\n").getBytes());
-            fos.close();
-
-            Intent intent = new Intent(ServiceActivity.this, MainActivity.class);
-            startActivity(intent);
-        }
-
-    }
-
 
 
     private void updateValue(int index, String val) {
@@ -395,14 +361,42 @@ public class ServiceActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
-        //Save the setting on shared preferences
-        myOBDService.stopOBDService();
         SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString(CAR_INFO,"");
         editor.apply();
         startActivity(intent);
     }
+
+
+    public void deleteProfile(View view) {
+        File cardir = new File(this.getFilesDir() + "/" + carInfo);
+        if (cardir.exists()) {
+            for(File file: cardir.listFiles())
+                if (!file.isDirectory())
+                    file.delete();
+            cardir.delete();
+
+            Intent intent = new Intent(ServiceActivity.this, MainActivity.class);
+            Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
+            stopService(serviceIntent);
+            //In Case receiver is already not registed
+            try {
+                unregisterReceiver(myReceiver);
+            } catch(IllegalArgumentException e) {
+
+                e.printStackTrace();
+            }
+            SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putString(CAR_INFO,"");
+            editor.apply();
+            startActivity(intent);
+        }
+
+    }
+
+
 
 
     private class MyReceiver extends BroadcastReceiver {
@@ -597,6 +591,7 @@ public class ServiceActivity extends AppCompatActivity {
                     serviceIntent.putExtra("BT_DEVICE", deviceBT);
                     serviceIntent.putExtra("CAR_INFO", carInfo);
                     serviceIntent.putExtra("CONECTION_TYPE", connectionType);
+                    myOBDService.setBlueToothTimeout(100);
                     myOBDService.stopOBDService();
                     startService(serviceIntent);
                     setLogON();

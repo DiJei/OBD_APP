@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 public class BluetoothManager {
@@ -23,7 +25,7 @@ public class BluetoothManager {
     android.os.Handler mHandler = null;
     BluetoothSocket mmSocket = null;
     byte[] buffer;
-
+    int timer = 200;
     ArrayList<String> vinCar = new ArrayList<>();
     int vinCount = 0;
     boolean vinEnable = false;
@@ -49,7 +51,7 @@ public class BluetoothManager {
     public void setHandler(android.os.Handler handle) {
         mHandler = handle;
     }
-
+    public void setTimer(int time) {timer = time;}
 
     //Thread to establish connection
     private class ConnectThread extends Thread {
@@ -140,33 +142,44 @@ public class BluetoothManager {
             // Keep listening to the InputStream until an exception occurs
             while (true) {
                 ArrayList<String> receive = new ArrayList<>();
-                buffer = new byte[36];
+                buffer = new byte[1024];
                 String message = "";
 
                 try {
                     int data = mmInStream.available();
-                    if (data > 0) {
+                    Thread.sleep(timer);
+                    if (data >= 2) {
 
 
                         mmInStream.read(buffer);
                         message = new String(buffer, 0, data);
 
-                        message = message.replace("\n", "");
-                        message = message.replace("\r", "");
-                        message = message.replace(">", "");
-                        message = message.replace(" ", "");
-
-
-                        if (message.contains("4902")) {
+                        //message = message.replace(" ", "");
+                        if (message.contains("49 02")) {
                             vinEnable = true;
                         }
+
+                        if (!vinEnable)
+                            message = message.replace("\n", "");
+                        message = message.replace("\r", "");
+                        message = message.replace(">", "");
+
+
+
+
                         if (vinEnable) {
-                            vinCar.add(message);
-                            vinCount = vinCount + 1;
+                            List<String> items = Arrays.asList(message.split( "\n"));
+                            for(int x = 0; x < items.size();x++) {
+                                vinCar.add(items.get(x));
+                            }
+
                         }
 
 
-                        if (!message.equals("") && !message.contains("SEARCHING") && !message.contains("CANERROR") && (vinEnable == false)) {
+                        if (message.length() < 2)
+                            message = "";
+
+                        if (!message.equals("") && !message.contains("SEARCHING")  && (vinEnable == false)) {
                             receive.add(message);
                             Message readMsg = mHandler.obtainMessage();
                             Bundle bundle2 = new Bundle();
@@ -175,7 +188,7 @@ public class BluetoothManager {
                             readMsg.what = MESSAGE_READ_BT;
                             mHandler.sendMessage(readMsg);
                         }
-                        else if (vinCount >= 3) {
+                        else if (vinCar.size() == 3) {
                             Message readMsg = mHandler.obtainMessage();
                             Bundle bundle2 = new Bundle();
                             bundle2.putStringArrayList("DATA", vinCar);
@@ -186,9 +199,12 @@ public class BluetoothManager {
                             vinEnable = false;
                             vinCar = new ArrayList<>();
                         }
+
                     }
                 } catch (IOException e) {
                     break;
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
             }
         }

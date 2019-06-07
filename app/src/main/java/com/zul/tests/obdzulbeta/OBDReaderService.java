@@ -184,10 +184,14 @@ public class OBDReaderService extends Service {
         float IMAP  = (rpm * pressure)/ (airTemp * 2);
         double MAP_C = (IMAP/60) * (80/10) * 1.6 * K;
         double cons = MAP_C /(14.7*720);
-        double  result =  (cons - cons_ant);
+
+        double  dls =  (cons - cons_ant);
+        if (dls < 0)
+            dls *= -1;
+
+        double result = amount_fuel + cons_ant + dls/2;
+
         cons_ant = cons;
-        if(result < 0)
-            result *= -1;
         return result;
     }
 

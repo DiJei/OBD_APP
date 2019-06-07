@@ -39,8 +39,6 @@ public class LoginScreen extends AppCompatActivity {
 
     public void beginService(View view) throws IOException {
 
-        String FILENAME = "listCars.txt";
-
         String brandCar = brand.getText().toString();
         String modelCar = model.getText().toString();
         String engineCar = engine.getText().toString();

@@ -178,17 +178,21 @@ public class OBDService {
         StringBuilder output = new StringBuilder("");
         String hexStr;
 
-        hexStr = message.get(0).substring(19).replace(" ","");
+
+        hexStr = message.get(0).replace(" ", "");
+        hexStr = hexStr.substring(13);
         for (int i = 0; i < hexStr.length(); i += 2) {
             String str = hexStr.substring(i, i + 2);
             output.append((char) Integer.parseInt(str, 16));
         }
-        hexStr = message.get(1).substring(6).replace( " ", "");
+        hexStr = message.get(1).replace(" ", "");
+        hexStr = hexStr.substring(5);
         for (int i = 0; i < hexStr.length(); i += 2) {
             String str = hexStr.substring(i, i + 2);
             output.append((char) Integer.parseInt(str, 16));
         }
-        hexStr = message.get(2).substring(6).replace(" ", "");
+        hexStr = message.get(2).replace(" ", "");
+        hexStr = hexStr.substring(5);
         for (int i = 0; i < hexStr.length(); i += 2) {
             String str = hexStr.substring(i, i + 2);
             output.append((char) Integer.parseInt(str, 16));
@@ -204,6 +208,7 @@ public class OBDService {
         }
     }
 
+    public void setBlueToothTimeout(int time) { mBluetoothManager.setTimer(time);}
 
     public ArrayList<String> getService01() {
         return listOfPIDs01;
@@ -223,7 +228,7 @@ public class OBDService {
         configList.add("ATZ");        // 0  Reset
         configList.add("ATE0");       // 1  Echo OFF
 
-        configList.add("ATST19");     // 2  Timeout 100ms
+        configList.add("ATST32");     // 2  Timeout 100ms
         configList.add("ATH1");       // 3  Headers ON
         configList.add("ATSP0");      // 4  Protocol AUTO
 
@@ -330,13 +335,17 @@ public class OBDService {
                     case 11:
                         getResponse = true;
                         for (x = 0; x < message.size(); x++) {
-                            if (message.get(x).contains("ERROR"))
+                            if (message.get(x).contains("ERROR") || message.get(x).contains("STOPPED")) {
                                 getResponse = false;
+                                break;
+                            }
                             else
                                 vinByte.add(message.get(x));
                         }
-                        if (vinByte.size() < 3)
+                        if (vinByte.size() < 3) {
+                            vinByte = new ArrayList<>();
                             sendATCommand(configList.get(count));
+                        }
                         if(getResponse) {
                             if (message.get(0).contains("49")) {
                                 vehicleVIN = decodeVIN(vinByte);
@@ -347,6 +356,7 @@ public class OBDService {
                             }
                         }
                         else {
+                            vinByte = new ArrayList<>();
                             sendATCommand(configList.get(count));
                         }
 
