@@ -48,6 +48,7 @@ public class TCPSocketManager {
                 s = new Socket(ip, port);
                 pw = new PrintWriter(s.getOutputStream());
                 pw.write(message);
+                Thread.sleep(100);
                 pw.flush();
                 BufferedReader inFromServer = new BufferedReader(new InputStreamReader(s.getInputStream()));
                 //get response from server
@@ -65,6 +66,8 @@ public class TCPSocketManager {
                 mHandler.sendMessage(readMsg);
             } catch (IOException e) {
                 Log.d(TAG, "Error: could not send message to OBD");
+                e.printStackTrace();
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
             return null;

@@ -18,4 +18,5 @@
     <string name="status">conectando..</string>
     <string name="stop_log">STOP LOG</string>
     <string name="home">HOME</string>
+    <string name="send_logs">send logs</string>
 </resources>

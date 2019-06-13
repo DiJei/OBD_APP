@@ -7,6 +7,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.net.Uri;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
@@ -17,17 +19,17 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 import com.zul.tests.obdzulbeta.OBDService.OBDService;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +43,6 @@ public class ServiceActivity extends AppCompatActivity {
     String btAdress = "";
     String obd_protocol = "";
     String carInfo = "";
-    String FILENAME = "listCars";
     TextView status = null;
     OBDService myOBDService  = null;
     int countDTC;
@@ -55,15 +56,22 @@ public class ServiceActivity extends AppCompatActivity {
     private static final int PROTOCOL_OBD = 5;
     private static final int BT_THREAD_READY = 7;
     Button logginButton = null;
-
+    File appDir = null;
     private static final String SHARED_PREFS = "SHARED_PREFS";
     private static final String CONECTION_TYPE = "CONECTION_TYPE";
     private static final String BT = "BT";
     private static final String CAR_INFO = "CAR_INFO";
+    String protocolNumber  = "";
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        if (!isExternalStorageAvailable() || isExternalStorageReadOnly()) {
+            Toast.makeText(getApplicationContext(), "Cant acess extenal storage", Toast.LENGTH_SHORT).show();
+        }
+        else
+            appDir = new File(getExternalFilesDir(null) + "/" + carInfo);
+
         countDTC = 10;
         amount_fuel = 0;
         count = 10;
@@ -96,25 +104,29 @@ public class ServiceActivity extends AppCompatActivity {
         status = (TextView) findViewById(R.id.statusText);
         pidListView = (ListView) findViewById(R.id.listOfPIDs);
         logginButton = (Button) findViewById(R.id.logButton);
+        protocolNumber = getProtocolNumber();
 
         if (connectionType.equals("WIFI")) {
             if (myOBDService == null)
-                myOBDService = new OBDService(uiHandler, "192.168.0.10", 35000);
-            if(!isLogOn())
-                myOBDService.configOBD();
+                myOBDService = new OBDService(uiHandler, "192.168.0.10", 35000, protocolNumber);
+            if(!isLogOn()) {
+                    myOBDService.configOBD();
+            }
 
         } else if (connectionType.equals("BT")) {
             String[] parts = deviceBT.split(" ");
             btAdress = parts[1];
             if (myOBDService == null)
-                if(!isLogOn())
-                    myOBDService = new OBDService(uiHandler, parts[1],true);
+                if(!isLogOn()) {
+                    myOBDService = new OBDService(uiHandler, parts[1], true, protocolNumber);
+                }
         }
 
         dataList.add(new ItemPID( "Temperatura da água", "x", "°C"));
         dataList.add(new ItemPID( "Bateria", "x", "V"));
         dataList.add(new ItemPID( "Alternador", "x", "V"));
         dataList.add(new ItemPID( "Litros de combústivel usados", "x", "L"));
+        dataList.add(new ItemPID( "Kilometros por litros médio", "x", "KPL"));
         dataList.add(new ItemPID( "", "DTC", ""));
 
         ArrayAdapter<ItemPID> adapter = new ItemPIDArrayAdapter(this, 0, dataList);
@@ -123,7 +135,7 @@ public class ServiceActivity extends AppCompatActivity {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 
-                if(position == 4) {
+                if(position == 5) {
                     //In Case receiver is already not registed
                     try {
 
@@ -135,6 +147,8 @@ public class ServiceActivity extends AppCompatActivity {
 
                     Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
                     stopService(serviceIntent);
+                    logginButton.setText("START LOG");
+                    setLogOFF();
                     countDTC = 0;
                     Runnable startDTC = new Runnable() {
                         public void run() {
@@ -143,7 +157,7 @@ public class ServiceActivity extends AppCompatActivity {
                     };
                     Runnable initBT = new Runnable() {
                         public void run() {
-                            myOBDService = new OBDService(uiHandler, btAdress,false);
+                            myOBDService = new OBDService(uiHandler, btAdress,false,protocolNumber);
                         }
                     };
                     Handler handler2 = new Handler();
@@ -165,7 +179,6 @@ public class ServiceActivity extends AppCompatActivity {
          pendingCodes= " ";
          troubleCodes= " ";
          permanentCodes = " ";
-
     }
 
 
@@ -188,7 +201,6 @@ public class ServiceActivity extends AppCompatActivity {
         outState.putString("ConectionType", connectionType);
         if(connectionType.equals("BT"))
             outState.putString("BTDevice", deviceBT);
-
         outState.putString("CarInfo", carInfo);
     }
 
@@ -198,18 +210,16 @@ public class ServiceActivity extends AppCompatActivity {
         super.onRestoreInstanceState(savedInstanceState);
         connectionType = savedInstanceState.getString("ConectionType");
         btAdress = savedInstanceState.getString("BTDevice");
-
     }
 
 
     public boolean isLogOn() {
-
-        File file = new File(this.getFilesDir() + "/" + carInfo +  "/info.txt");
+        File file =  new File(getExternalFilesDir(null) + "/" + carInfo + "/info.txt");
         if(!file.exists())
             return false;
         BufferedReader reader;
         try {
-            reader = new BufferedReader(new FileReader(this.getFilesDir() + "/" + carInfo +  "/info.txt"));
+            reader = new BufferedReader(new FileReader(appDir.getPath() + "/info.txt"));
             String line = reader.readLine();
             while (line != null) {
                 if(line.contains("LOG")) {
@@ -287,10 +297,16 @@ public class ServiceActivity extends AppCompatActivity {
                 serviceIntent.putExtra("CAR_INFO", carInfo);
                 serviceIntent.putExtra("CONECTION_TYPE", connectionType);
                 myOBDService.stopOBDService();
+                logginButton.setText("STOP LOG");
+                //Start service
+                setLogON();
                 startService(serviceIntent);
+                //Start reading from service
+                myReceiver = new MyReceiver();
                 IntentFilter intentFilter = new IntentFilter();
                 intentFilter.addAction(OBDReaderService.MY_ACTION);
                 registerReceiver(myReceiver, intentFilter);
+
                 //-------------//
                 break;
             default:
@@ -370,7 +386,7 @@ public class ServiceActivity extends AppCompatActivity {
 
 
     public void deleteProfile(View view) {
-        File cardir = new File(this.getFilesDir() + "/" + carInfo);
+        File cardir = new File(getExternalFilesDir(null) + "/" + carInfo);
         if (cardir.exists()) {
             for(File file: cardir.listFiles())
                 if (!file.isDirectory())
@@ -396,7 +412,62 @@ public class ServiceActivity extends AppCompatActivity {
 
     }
 
+    public void sendLogsEmail(View view) {
 
+        final ArrayList<Uri> uris = new ArrayList<Uri>();
+
+        if(isLogOn()) {
+            Toast.makeText(getApplicationContext(), "Desligue o log antes de enviar", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final Intent intent = new Intent(Intent.ACTION_SEND_MULTIPLE);
+
+
+        intent.putExtra(Intent.EXTRA_SUBJECT, carInfo + " LOGS OBD APP");
+        intent.putExtra(Intent.EXTRA_TEXT, "Logs in attachments");
+        //only e-mails for now
+        intent.setType("message/rfc822");
+        Uri uri = null;
+
+        //Ask email
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Digite seu e-mail:");
+        builder.setMessage("e-mail..");
+        final EditText userInput = new EditText(this);
+        builder.setView(userInput);
+        builder.setPositiveButton("ok", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String send = userInput.getText().toString();
+                intent.putExtra(Intent.EXTRA_EMAIL, send);
+                File cardir = new File(getExternalFilesDir(null) + "/" + carInfo);
+                if (cardir.exists()) {
+                    for(File file: cardir.listFiles())
+                        if (!file.isDirectory())
+                            uris.add(Uri.fromFile(file));
+                    if(uris.size() > 0 ) {
+                        intent.putExtra(Intent.EXTRA_STREAM, uris);
+                        startActivity(Intent.createChooser(intent, "Choose an email client"));
+                    }
+                }
+            }
+        });
+
+        builder.setNegativeButton("cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+
+
+        AlertDialog alert = builder.create();
+        alert.show();
+
+
+
+    }
 
 
     private class MyReceiver extends BroadcastReceiver {
@@ -411,6 +482,7 @@ public class ServiceActivity extends AppCompatActivity {
             updateValue(1, listOfData.get(1));
             updateValue(2, listOfData.get(2));
             updateValue(3, listOfData.get(3));
+            updateValue(4, listOfData.get(4));
         }
 
     }
@@ -454,12 +526,14 @@ public class ServiceActivity extends AppCompatActivity {
 
 
     public void createInfoFIle() throws FileNotFoundException {
-        File file = new File(this.getFilesDir() + "/" + carInfo + "/info.txt");
+        File file = new File(getExternalFilesDir(null) + "/" + carInfo + "/info.txt");
+        //File file = new File(appDir,"info.txt");
         //If already exist dont need to write over again
         if (file.exists())
             return;
         //Create info file for the car
         PrintWriter printWriter = new PrintWriter(file);
+        printWriter.println(obd_protocol);
         printWriter.println (carInfo);
         printWriter.println (myOBDService.getService01());
         printWriter.println (myOBDService.getService09());
@@ -471,8 +545,7 @@ public class ServiceActivity extends AppCompatActivity {
 
     public void setLogON() {
         try {
-            File fileToChange = new File(this.getFilesDir() + "/" + carInfo + "/info.txt");
-
+            File fileToChange = new File(getExternalFilesDir(null) + "/" + carInfo + "/info.txt");
             // input the file content to the StringBuffer "input"
             BufferedReader file = new BufferedReader(new FileReader(fileToChange));
             StringBuffer inputBuffer = new StringBuffer();
@@ -490,7 +563,6 @@ public class ServiceActivity extends AppCompatActivity {
             inputStr = inputStr.replace("LOG:off","LOG:on");
 
 
-
             // write the new string with the replaced line OVER the same file
             FileOutputStream fileOut = new FileOutputStream( fileToChange );
             fileOut.write(inputStr.getBytes());
@@ -503,8 +575,8 @@ public class ServiceActivity extends AppCompatActivity {
 
     public void setLogOFF() {
         try {
-            File fileToChange = new File(this.getFilesDir() + "/" + carInfo + "/info.txt");
 
+            File fileToChange = new File(getExternalFilesDir(null) + "/" + carInfo + "/info.txt");
             // input the file content to the StringBuffer "input"
             BufferedReader file = new BufferedReader(new FileReader(fileToChange));
             StringBuffer inputBuffer = new StringBuffer();
@@ -517,10 +589,8 @@ public class ServiceActivity extends AppCompatActivity {
             file.close();
             String inputStr = inputBuffer.toString();
 
-
             // logic to replace lines in the string (could use regex here to be generic)
             inputStr = inputStr.replace("LOG:on","LOG:off");
-
 
             // write the new string with the replaced line OVER the same file
             FileOutputStream fileOut = new FileOutputStream( fileToChange );
@@ -531,6 +601,43 @@ public class ServiceActivity extends AppCompatActivity {
 
         }
     }
+
+    public String getProtocolNumber() {
+        try {
+            File file = new File(getExternalFilesDir(null) + "/" + carInfo + "/info.txt");
+            if(!file.exists())
+                return "nope";
+            BufferedReader reader = new BufferedReader(new FileReader(file));
+            String line = reader.readLine();
+            if (line != null || !line.contains("null")) {
+                return line.substring(line.length() - 1);
+            }
+            else {
+                return "nope";
+            }
+        } catch (Exception e) {
+            return "nope";
+        }
+
+    }
+
+
+    private static boolean isExternalStorageReadOnly() {
+        String extStorageState = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED_READ_ONLY.equals(extStorageState)) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isExternalStorageAvailable() {
+        String extStorageState = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(extStorageState)) {
+            return true;
+        }
+        return false;
+    }
+
 
     private  final android.os.Handler uiHandler = new android.os.Handler()
     {
@@ -581,19 +688,23 @@ public class ServiceActivity extends AppCompatActivity {
                     obd_protocol = message;
                     status.setText("pronto");
                     //----Create Info file----//
-                    try {
-                        createInfoFIle();
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
+                    if(protocolNumber.equals("nope")) {
+                        try {
+                            createInfoFIle();
+                        } catch (FileNotFoundException e) {
+                            e.printStackTrace();
+                        }
                     }
                     //-- Start Loop Service read data--//
                     Intent serviceIntent = new Intent(ServiceActivity.this, OBDReaderService.class);
                     serviceIntent.putExtra("BT_DEVICE", deviceBT);
                     serviceIntent.putExtra("CAR_INFO", carInfo);
                     serviceIntent.putExtra("CONECTION_TYPE", connectionType);
+                    serviceIntent.putExtra("PROTOCOL_NUMBER", protocolNumber);
                     myOBDService.setBlueToothTimeout(100);
                     myOBDService.stopOBDService();
                     startService(serviceIntent);
+                    logginButton.setText("STOP LOG");
                     setLogON();
                     //--------------------------//
                     break;

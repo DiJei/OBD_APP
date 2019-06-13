@@ -122,7 +122,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         final ArrayAdapter<String> mArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_activated_1);
         View row = getLayoutInflater().inflate(R.layout.car_list_view, null);
         ListView listCar = (ListView) row.findViewById(R.id.deviceList);
-        File[] directories = new File(String.valueOf(this.getFilesDir())).listFiles(new FileFilter() {
+        File[] directories = new File(String.valueOf(getExternalFilesDir(null))).listFiles(new FileFilter() {
             @Override
             public boolean accept(File file) {
                 return file.isDirectory();

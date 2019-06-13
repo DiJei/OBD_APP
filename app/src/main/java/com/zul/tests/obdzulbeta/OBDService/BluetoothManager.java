@@ -25,8 +25,8 @@ public class BluetoothManager {
     android.os.Handler mHandler = null;
     BluetoothSocket mmSocket = null;
     byte[] buffer;
-    int timer = 200;
-    ArrayList<String> vinCar = new ArrayList<>();
+    int timer = 400;
+    ArrayList<String> received = new ArrayList<>();
     int vinCount = 0;
     boolean vinEnable = false;
 
@@ -159,45 +159,36 @@ public class BluetoothManager {
                             vinEnable = true;
                         }
 
-                        if (!vinEnable)
-                            message = message.replace("\n", "");
+
                         message = message.replace("\r", "");
                         message = message.replace(">", "");
 
 
+                        List<String> items = Arrays.asList(message.split( "\n"));
+                        for(int x = 0; x < items.size();x++)
+                                received.add(items.get(x));
 
-
-                        if (vinEnable) {
-                            List<String> items = Arrays.asList(message.split( "\n"));
-                            for(int x = 0; x < items.size();x++) {
-                                vinCar.add(items.get(x));
-                            }
-
-                        }
-
-
-                        if (message.length() < 2)
-                            message = "";
-
-                        if (!message.equals("") && !message.contains("SEARCHING")  && (vinEnable == false)) {
-                            receive.add(message);
+                        int index =  checkReceivedMessages(received);
+                        if ( index > -1  && (vinEnable == false)) {
+                            receive.add(received.get(index));
                             Message readMsg = mHandler.obtainMessage();
                             Bundle bundle2 = new Bundle();
                             bundle2.putStringArrayList("DATA", receive);
                             readMsg.setData(bundle2);
                             readMsg.what = MESSAGE_READ_BT;
                             mHandler.sendMessage(readMsg);
+                            received = new ArrayList<>();
                         }
-                        else if (vinCar.size() == 3) {
+                        else if (received.size() == 3) {
                             Message readMsg = mHandler.obtainMessage();
                             Bundle bundle2 = new Bundle();
-                            bundle2.putStringArrayList("DATA", vinCar);
+                            bundle2.putStringArrayList("DATA", received);
                             readMsg.setData(bundle2);
                             readMsg.what = MESSAGE_READ_BT;
                             mHandler.sendMessage(readMsg);
                             vinCount = 0;
                             vinEnable = false;
-                            vinCar = new ArrayList<>();
+                            received = new ArrayList<>();
                         }
 
                     }
@@ -207,6 +198,19 @@ public class BluetoothManager {
                     e.printStackTrace();
                 }
             }
+        }
+
+
+        private int checkReceivedMessages(ArrayList<String> msg) {
+            int hasData = -1;
+
+            for(int x = 0; x < msg.size(); x++) {
+                if (!msg.get(x).equals("") && !msg.get(x).contains("SEARCHING")) {
+                    hasData = x;
+                    break;
+                }
+            }
+            return hasData;
         }
 
         /* Call this from the main activity to send data to the remote device */

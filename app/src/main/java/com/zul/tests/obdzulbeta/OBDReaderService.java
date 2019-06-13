@@ -37,6 +37,11 @@ public class OBDReaderService extends Service {
     int tryOuts = 0;
     boolean flag_write = true;
     File logFile = null;
+    String protocolNumber = null;
+
+    int i;
+    double kpl = 0;
+    double mean_kpl = 0;
 
     Handler handler = new Handler();
     private Runnable periodicUpdate = new Runnable () {
@@ -65,14 +70,15 @@ public class OBDReaderService extends Service {
         Bundle extras =  intent.getExtras();
 
         carInfo = extras.getString("CAR_INFO");;
+        protocolNumber = extras.getString("PROTOCOL_NUMBER");
         String conectionType = extras.getString("CONECTION_TYPE");
         if (conectionType.equals("BT")) {
             String deviceBT = extras.getString("BT_DEVICE");
             String[] parts = deviceBT.split(" ");
-            myOBDService = new OBDService(uiHandler, parts[1], false);
+            myOBDService = new OBDService(uiHandler, parts[1], false, protocolNumber);
         }
         else if (conectionType.equals("WIFI")) {
-            myOBDService  = new OBDService(uiHandler, "192.168.0.10", 35000);
+            myOBDService  = new OBDService(uiHandler, "192.168.0.10", 35000, protocolNumber);
         }
         /*   init values  */
         tempCool = "0";
@@ -86,6 +92,9 @@ public class OBDReaderService extends Service {
         countDTC = 0;
         amount_fuel = 0;
         cons_ant = 0;
+        mean_kpl = 0;
+        kpl = 0;
+        i = 0;
 
         try {
             logFile = createLogFile();
@@ -146,8 +155,7 @@ public class OBDReaderService extends Service {
         Date day = Calendar.getInstance().getTime();
         SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
         String logName = "log-"+df.format(day)+".txt";
-        File file = new File(this.getFilesDir() + "/" + carInfo + "/" + logName);
-
+        File file = new File(getExternalFilesDir(null) + "/" + carInfo + "/" + logName);
         if(file.exists())
             return file;
         else {
@@ -163,8 +171,7 @@ public class OBDReaderService extends Service {
             return;
         try {
             // Open given file in append mode.
-            BufferedWriter out = new BufferedWriter(
-                    new FileWriter(logFile.getPath(), true));
+            BufferedWriter out = new BufferedWriter(new FileWriter(logFile.getPath(), true));
             out.write(line);
             out.close();
         }
@@ -182,17 +189,18 @@ public class OBDReaderService extends Service {
         if (airTemp == 0)
             airTemp = 1;
         float IMAP  = (rpm * pressure)/ (airTemp * 2);
-        double MAP_C = (IMAP/60) * (80/10) * 1.6 * K;
-        double cons = MAP_C /(14.7*720);
+        double MAF_C = (IMAP/60) * (80/10) * 1.6 * K;
+        double cons = MAF_C /(14.7*720);
+        kpl = Integer.parseInt(speed)/(cons*3600);
 
-        double  dls =  (cons - cons_ant);
-        if (dls < 0)
-            dls *= -1;
+        return amount_fuel + cons;
+    }
 
-        double result = amount_fuel + cons_ant + dls/2;
-
-        cons_ant = cons;
-        return result;
+    //Calculate mean kilometer per liter
+    public double calculateMeanKpl(int n, double kpm, double running_mean) {
+        if (n == 1)
+            return kpm;
+        return running_mean + (kpm - running_mean)/n;
     }
 
 
@@ -215,8 +223,9 @@ public class OBDReaderService extends Service {
                     break;
                 case 7:
                     //--Calculate instant fuel Consumption---//
-                    amount_fuel += calculateFuelConsumption(Integer.parseInt(RPM), Integer.parseInt(IAT), Integer.parseInt(MAP));
-                    //updateValue(3, String.format("%.2f", amount_fuel));1
+                    i += 1;
+                    amount_fuel = calculateFuelConsumption(Integer.parseInt(RPM), Integer.parseInt(IAT), Integer.parseInt(MAP));
+                    mean_kpl = calculateMeanKpl(i,kpl,mean_kpl);
                     //----------------
 
                     //Update Log File
@@ -230,6 +239,7 @@ public class OBDReaderService extends Service {
                     listOFdata.add(battery);
                     listOFdata.add(alternator);
                     listOFdata.add( String.format("%.2f", amount_fuel));
+                    listOFdata.add( String.format("%.2f", mean_kpl));
                     intent.putStringArrayListExtra("DATA", listOFdata);
                     sendBroadcast(intent);
                     //Reset order of commands
@@ -239,8 +249,6 @@ public class OBDReaderService extends Service {
             }
 
     }
-
-
 
 
     private  final android.os.Handler uiHandler = new android.os.Handler() {
@@ -305,6 +313,4 @@ public class OBDReaderService extends Service {
             }
         }
     };
-
-
 }

@@ -39,6 +39,8 @@ public class OBDService {
     ArrayList<String> message;
     int count = 0;
     ArrayList<String> vinByte = new ArrayList();
+    String protocolNumber = null;
+
     private String[] ProtocolList = {
             "Auto",
             "SAE J1850 PWM",
@@ -56,7 +58,7 @@ public class OBDService {
 
 
     //For Bluetooth Device
-    public  OBDService(android.os.Handler handler, String device, Boolean INIT) {
+    public  OBDService(android.os.Handler handler, String device, Boolean INIT, String protocol) {
         uiHandler = handler;
         mBTAdapter = BluetoothAdapter.getDefaultAdapter();
         BluetoothDevice btDevice = mBTAdapter.getRemoteDevice(device);
@@ -66,14 +68,16 @@ public class OBDService {
             mBluetoothManager.startClient(btDevice);
         }
         init = INIT;
+        protocolNumber = protocol;
     }
 
     //For WiFi TCP Device
-    public  OBDService(android.os.Handler handler, String ips, int ports) {
+    public  OBDService(android.os.Handler handler, String ips, int ports, String protocol) {
         uiHandler = handler;
         ip = ips;
         port = ports;
         mWifiTCPSocketManager = new TCPSocketManager("192.168.0.10", 35000, obdHandler);
+        protocolNumber = protocol;
     }
 
 
@@ -208,7 +212,10 @@ public class OBDService {
         }
     }
 
-    public void setBlueToothTimeout(int time) { mBluetoothManager.setTimer(time);}
+    public void setBlueToothTimeout(int time) {
+        if (mBluetoothManager != null)
+         mBluetoothManager.setTimer(time);
+    }
 
     public ArrayList<String> getService01() {
         return listOfPIDs01;
@@ -230,7 +237,11 @@ public class OBDService {
 
         configList.add("ATST32");     // 2  Timeout 100ms
         configList.add("ATH1");       // 3  Headers ON
-        configList.add("ATSP0");      // 4  Protocol AUTO
+
+        if(protocolNumber.equals("nope"))
+            configList.add("ATSP0");      // 4  Protocol AUTO
+        else
+            configList.add("ATSP" + protocolNumber);      // 4  Protocol AUTO
 
         configList.add("0100");       // 5  List Of PID 01
         configList.add("0120");       // 6  List Of PID 01
@@ -297,6 +308,11 @@ public class OBDService {
                             if (message.get(x).contains("41")) {
                                 count += 1;
                                 getResponse = true;
+                                if(!protocolNumber.equals("nope")) {
+                                    count = 12;
+                                    sendATCommand(configList.get(count));
+                                }
+
                                 listOfPIDs01.add(message.get(x).substring(message.get(x).indexOf("41") + 4).replace(" ", ""));
                                 sendATCommand(configList.get(count));
                                 break;
@@ -346,20 +362,13 @@ public class OBDService {
                             vinByte = new ArrayList<>();
                             sendATCommand(configList.get(count));
                         }
-                        if(getResponse) {
+                        else if(getResponse) {
                             if (message.get(0).contains("49")) {
                                 vehicleVIN = decodeVIN(vinByte);
                                 count += 1;
                                 sendATCommand(configList.get(count));
-                            } else {
-                                sendATCommand(configList.get(count));
                             }
                         }
-                        else {
-                            vinByte = new ArrayList<>();
-                            sendATCommand(configList.get(count));
-                        }
-
                         break;
                     case 12:
                         Bundle uiBundle = new Bundle();
@@ -367,9 +376,10 @@ public class OBDService {
                         if((message.get(0).contains("ERROR")) || (message.get(0).contains("NO")))
                             sendATCommand(configList.get(count));
                         else    {
-                            String send = ProtocolList[Integer.parseInt(message.get(0).substring(message.get(0).indexOf("A") + 1))];
+                            String send = ProtocolList[Integer.parseInt(message.get(0).substring(message.get(0).indexOf("A") + 1))] + " " + message.get(0).substring(message.get(0).indexOf("A") + 1);
                             uiBundle.putString("data", send);
                             readMsg.what = PROTOCOL_OBD;
+                            readMsg.setData(uiBundle);
                             uiHandler.sendMessage(readMsg);
                             count += 1;
                         }

@@ -2,6 +2,7 @@ package com.zul.tests.obdzulbeta;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -14,7 +15,7 @@ import java.io.File;
 
 
 
-import java.io.IOException;
+
 
 
 public class LoginScreen extends AppCompatActivity {
@@ -22,6 +23,7 @@ public class LoginScreen extends AppCompatActivity {
     EditText year,engine,model,brand,fuelType = null;
     String connectionType = "";
     String btDevice = "";
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,9 +37,10 @@ public class LoginScreen extends AppCompatActivity {
         fuelType = (EditText)findViewById(R.id.fuelType);
         connectionType = extras.getString("CONECTION_TYPE");
         btDevice = extras.getString("BT_DEVICE");
+
     }
 
-    public void beginService(View view) throws IOException {
+    public  void   beginService(View view)  {
 
         String brandCar = brand.getText().toString();
         String modelCar = model.getText().toString();
@@ -70,14 +73,20 @@ public class LoginScreen extends AppCompatActivity {
 
 
 
-        //File newdir= this.getDir(carLine, Context.MODE_PRIVATE);
-        File newdir = new File(this.getFilesDir() + "/" + carLine);
+        File newdir = new File(getExternalFilesDir(null) + "/" + carLine);
+        if(newdir.exists()) {
+            Toast.makeText(getApplicationContext(), "Carro já existe", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        newdir.mkdirs();
+
         if (!newdir.exists()) {
-            newdir.mkdirs();
-            Toast.makeText(getApplicationContext(), "Registrado", Toast.LENGTH_LONG).show();
+            Toast.makeText(getApplicationContext(), "Problema na craicação", Toast.LENGTH_LONG).show();
+            return;
         }
         else {
-            Toast.makeText(getApplicationContext(), "Carro já registrado", Toast.LENGTH_LONG).show();
+            Toast.makeText(getApplicationContext(), "Carro criado", Toast.LENGTH_LONG).show();
         }
 
 
